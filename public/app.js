@@ -1,131 +1,66 @@
 // Client-Side Real-Time TradingView Engine & Scalping Controller
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 
-  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT',
-  'PEPEUSDT', 'SHIBUSDT', 'NEARUSDT', 'SUIUSDT'
+  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'
 ];
-
-// Pure Pine Script math: "All Charts · Sadeeq_Trading"
-function calculatePineIndicator(klines, brickMultiplier = 0.5, atrLen = 14) {
-  if (!Array.isArray(klines) || klines.length < atrLen + 2) return null;
-
-  const opens = klines.map(d => parseFloat(d[1]));
-  const highs = klines.map(d => parseFloat(d[2]));
-  const lows = klines.map(d => parseFloat(d[3]));
-  const closes = klines.map(d => parseFloat(d[4]));
-  const len = closes.length;
-
-  const tr = [highs[0] - lows[0]];
-  for (let i = 1; i < len; i++) {
-    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
-  }
-  let atrArr = new Array(len).fill(0);
-  let sum = 0;
-  for (let i = 0; i < atrLen; i++) sum += tr[i];
-  atrArr[atrLen - 1] = sum / atrLen;
-  for (let i = atrLen; i < len; i++) {
-    atrArr[i] = (atrArr[i - 1] * (atrLen - 1) + tr[i]) / atrLen;
-  }
-
-  let lbClose = closes[0];
-  let lbOpen = closes[0];
-  let cClose = [];
-  let cOpen = [];
-
-  for (let i = 0; i < len; i++) {
-    const c = closes[i];
-    const brick = atrArr[i] * brickMultiplier;
-    const prevLbClose = lbClose;
-    if (Math.abs(c - prevLbClose) >= brick) {
-      lbClose = c;
-    }
-    if (lbClose !== prevLbClose) {
-      lbOpen = prevLbClose;
-    }
-    cClose.push(lbClose);
-    cOpen.push(lbOpen);
-  }
-
-  const isUp = [];
-  for (let i = 0; i < len; i++) {
-    isUp.push(cClose[i] >= cOpen[i]);
-  }
-
-  const last = len - 1;
-  const prev = len - 2;
-  const longSig = isUp[last] && !isUp[prev];
-  const shortSig = !isUp[last] && isUp[prev];
-  const currColor = isUp[last] ? 'green' : 'red';
-
-  return {
-    price: closes[last],
-    candleColor: currColor,
-    signal: longSig ? 'LONG' : (shortSig ? 'SHORT' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
-    actionBadge: longSig ? 'LONG' : (shortSig ? 'SHORT' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
-    brickSize: (atrArr[last] * brickMultiplier).toFixed(4),
-    atr: atrArr[last].toFixed(4),
-    time: new Date(klines[last][0]).toLocaleTimeString()
-  };
-}
 
 let autoTradingEnabled = true;
 
 async function updateDashboard() {
   try {
+    // 1. Immediately load state.json first so UI never stays frozen on "Scanning..."
     let state = null;
-
     try {
       const stateRes = await fetch('./state.json?t=' + Date.now());
       if (stateRes.ok) {
         state = await stateRes.json();
       }
     } catch (e) {
-      console.log('State fetch error:', e);
+      console.warn('State fetch error:', e);
     }
 
     if (!state || !state.account) return;
 
-    const { account, recentSignals = [] } = state;
+    const { account, recentSignals = [], marketScan = {} } = state;
     const holdings = account.holdings || {};
 
-    // 24h Binance Tickers
+    // 2. Fetch live Binance tickers with an abort timeout
     let tickers = {};
     try {
-      const tickerRes = await fetch('https://data-api.binance.vision/api/v3/ticker/24hr');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3500);
+      const tickerRes = await fetch('https://data-api.binance.vision/api/v3/ticker/24hr', { signal: controller.signal });
+      clearTimeout(timeoutId);
       const allTickers = await tickerRes.json();
       allTickers.forEach(t => {
         if (SYMBOLS.includes(t.symbol)) tickers[t.symbol] = t;
       });
     } catch (e) {
-      console.warn('Ticker fetch error:', e);
+      console.warn('Ticker fetch fallback:', e.message);
     }
 
-    // Run Real-Time 3m High-Frequency Pine Script Indicator
+    // 3. Prepare market scan results using live tickers or fallback to recorded state
     const marketScanResults = [];
     for (const sym of SYMBOLS) {
-      try {
-        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=3m&limit=150`);
-        const klines = await klineRes.json();
-        const ind = calculatePineIndicator(klines, account.brickMultiplier || 0.5, account.atrPeriod || 14);
-        if (ind) {
-          const tick = tickers[sym] || { priceChangePercent: '0' };
-          marketScanResults.push({
-            symbol: sym,
-            price: ind.price,
-            priceChangePercent: parseFloat(tick.priceChangePercent),
-            candleColor: ind.candleColor,
-            brickSize: ind.brickSize,
-            actionBadge: ind.actionBadge,
-            signal: ind.signal,
-            time: ind.time
-          });
-        }
-      } catch (err) {
-        console.warn(`Error scanning ${sym}:`, err);
-      }
+      const saved = marketScan[sym] || {};
+      const tick = tickers[sym] || {};
+      const price = tick.lastPrice ? parseFloat(tick.lastPrice) : (saved.price || 0);
+      const priceChangePercent = tick.priceChangePercent ? parseFloat(tick.priceChangePercent) : 0;
+      const candleColor = saved.candleColor || (priceChangePercent >= 0 ? 'green' : 'red');
+      const brickSize = saved.brickSize || '0.00';
+      const actionBadge = saved.signal === 'BUY' ? 'LONG' : (saved.signal === 'SELL' ? 'SHORT' : (candleColor === 'green' ? 'BULLISH' : 'BEARISH'));
+
+      marketScanResults.push({
+        symbol: sym,
+        price,
+        priceChangePercent,
+        candleColor,
+        brickSize,
+        actionBadge
+      });
     }
 
-    // Dynamic Portfolio & Holdings Valuation
+    // 4. Calculate Portfolio Valuation
     let holdingsValue = 0;
     const holdingsEntries = Object.entries(holdings);
     const activeHoldingsData = [];
@@ -133,7 +68,7 @@ async function updateDashboard() {
     for (const [coin, data] of holdingsEntries) {
       const sym = `${coin}USDT`;
       const liveCoinData = marketScanResults.find(m => m.symbol === sym);
-      const curPrice = liveCoinData ? liveCoinData.price : (data.avgPrice || 0);
+      const curPrice = liveCoinData && liveCoinData.price > 0 ? liveCoinData.price : (data.avgPrice || 0);
       const val = data.amount * curPrice;
       const cost = data.amount * data.avgPrice;
       const unrealizedPnl = val - cost;
@@ -156,7 +91,7 @@ async function updateDashboard() {
     const profitPercent = ((netProfit / (account.initialBalance || 10000)) * 100).toFixed(2);
     const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
 
-    // 1. Metric Cards
+    // Render Metric Cards
     document.getElementById('val-portfolio').textContent = `$${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-cash').textContent = `Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
     
@@ -171,7 +106,7 @@ async function updateDashboard() {
     document.getElementById('val-holdings-val').textContent = `$${holdingsValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-holdings-count').textContent = `${holdingsEntries.length} active position${holdingsEntries.length === 1 ? '' : 's'}`;
 
-    // 2. Render Active Holdings Table
+    // Render Active Holdings Table (Immediate)
     const holdingsTbody = document.getElementById('holdings-tbody');
     if (holdingsTbody) {
       if (activeHoldingsData.length > 0) {
@@ -194,7 +129,7 @@ async function updateDashboard() {
       }
     }
 
-    // 3. Render Market Scanner Table
+    // Render Market Scanner Table (Immediate)
     const tbody = document.getElementById('market-tbody');
     if (tbody && marketScanResults.length > 0) {
       tbody.innerHTML = marketScanResults.map(item => {
@@ -218,7 +153,7 @@ async function updateDashboard() {
       }).join('');
     }
 
-    // 4. Render Recent Signals Fired
+    // Render Recent Signals Fired
     const signalList = document.getElementById('signal-list');
     if (signalList) {
       if (recentSignals && recentSignals.length > 0) {
@@ -244,7 +179,7 @@ async function updateDashboard() {
       }
     }
 
-    // 5. Render Paper Trading Execution Log
+    // Render Paper Trading Execution Log
     const tradeList = document.getElementById('trade-list');
     const tradeHistory = account.tradeHistory || [];
     if (tradeList) {
@@ -281,6 +216,6 @@ async function updateDashboard() {
   }
 }
 
-// Live update every 3 seconds directly on your screen
+// Immediate initial run and poll every 3 seconds
 updateDashboard();
 setInterval(updateDashboard, 3000);
