@@ -16,12 +16,13 @@ let defaultState = {
   account: {
     initialBalance: 10000.0,
     balance: 10000.0,
-    holdings: {},
+    leverage: 3, // Conservative 3x Leverage Futures
+    positions: {}, // { BTC: { side: 'LONG'|'SHORT', amount, entryPrice, margin, liqPrice, time } }
     tradeHistory: [],
     totalTrades: 0,
     winningTrades: 0,
     autoTradingEnabled: true,
-    riskPerTradePercent: 12,
+    riskPerTradePercent: 12, // 12% of available margin balance per contract
     chartMode: "Line Break Style",
     brickMultiplier: 0.5,
     atrPeriod: 14,
@@ -35,7 +36,10 @@ let defaultState = {
 function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      if (!data.account.positions) data.account.positions = {};
+      if (!data.account.leverage) data.account.leverage = 3;
+      return data;
     }
   } catch (e) {
     console.error('Error loading state, using default:', e);
@@ -55,7 +59,7 @@ function saveState(state) {
 
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubRunner/1.0' } }, (res) => {
+    https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubFutures/1.0' } }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -73,8 +77,6 @@ function fetchJSON(url) {
 // 100% PURE PINESCRIPT TRANSLATION: "All Charts · Sadeeq_Trading"
 // Options: Normal, Heikin Ashi, Wickless, Renko Style, Line Break Style
 // ----------------------------------------------------------------------
-
-// TradingView ta.atr() calculation using RMA (Wilder) smoothing
 function calculateATR(highs, lows, closes, period = 14) {
   const len = closes.length;
   if (len < period + 1) return 1;
@@ -126,9 +128,6 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
       cClose.push(curClose);
     }
   } else if (mode === "Renko Style") {
-    // Exact Pine Script:
-    // rClose := na(rClose[1]) ? close : close >= rClose[1] + brick ? rClose[1] + brick : close <= rClose[1] - brick ? rClose[1] - brick : rClose[1]
-    // rOpen := na(rOpen[1]) ? close : rClose != rClose[1] ? rClose[1] : rOpen[1]
     let rClose = closes[0];
     let rOpen = closes[0];
     for (let i = 0; i < len; i++) {
@@ -146,9 +145,7 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
       cClose.push(rClose);
     }
   } else {
-    // 5 · LINE BREAK STYLE (Exact Pine Script):
-    // lbClose := na(lbClose[1]) ? close : math.abs(close - lbClose[1]) >= brick ? close : lbClose[1]
-    // lbOpen := na(lbOpen[1]) ? close : lbClose != lbClose[1] ? lbClose[1] : lbOpen[1]
+    // 5 · LINE BREAK STYLE (Exact Pine Script)
     let lbClose = closes[0];
     let lbOpen = closes[0];
     for (let i = 0; i < len; i++) {
@@ -165,11 +162,6 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
     }
   }
 
-  // Exact Pine Script Signals:
-  // isUp = cClose >= cOpen
-  // isDown = cClose < cOpen
-  // longSig = isUp and not isUp[1]
-  // shortSig = isDown and not isDown[1]
   const isUp = [];
   for (let i = 0; i < len; i++) {
     isUp.push(cClose[i] >= cOpen[i]);
@@ -197,65 +189,113 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
   };
 }
 
-function executePaperTrade(state, symbol, action, price) {
+// ----------------------------------------------------------------------
+// FUTURES POSITION & CONTRACT ENGINE (LONG & SHORT with 3x-5x Leverage)
+// ----------------------------------------------------------------------
+
+function closeFuturesPosition(state, symbol, exitPrice, reason = '') {
+  const coin = symbol.replace('USDT', '');
+  const { account } = state;
+  const pos = account.positions[coin];
+  if (!pos) return null;
+
+  const timestamp = new Date().toLocaleTimeString();
+  const lev = pos.leverage || account.leverage || 3;
+  const notional = pos.amount * pos.entryPrice;
+
+  let pnl = 0;
+  if (pos.side === 'LONG') {
+    pnl = (exitPrice - pos.entryPrice) * pos.amount;
+  } else {
+    // SHORT profit: when price falls
+    pnl = (pos.entryPrice - exitPrice) * pos.amount;
+  }
+
+  const pnlPercent = (pnl / pos.margin) * 100;
+  account.balance += (pos.margin + pnl);
+  account.totalTrades++;
+  if (pnl > 0) account.winningTrades++;
+
+  const closedTrade = {
+    id: Date.now(),
+    symbol,
+    side: pos.side,
+    action: `CLOSE ${pos.side}`,
+    entryPrice: pos.entryPrice,
+    exitPrice,
+    amount: pos.amount,
+    margin: Number(pos.margin.toFixed(2)),
+    leverage: lev,
+    pnl: Number(pnl.toFixed(2)),
+    pnlPercent: Number(pnlPercent.toFixed(2)),
+    time: timestamp,
+    reason
+  };
+
+  account.tradeHistory.unshift(closedTrade);
+  if (account.tradeHistory.length > 50) account.tradeHistory.pop();
+  delete account.positions[coin];
+
+  console.log(`[FUTURES CLOSE] ${pos.side} ${symbol} @ $${exitPrice} | PnL: $${pnl.toFixed(2)} (${pnlPercent.toFixed(2)}%) | Reason: ${reason}`);
+  return closedTrade;
+}
+
+function openFuturesPosition(state, symbol, side, price, reason = '') {
   const coin = symbol.replace('USDT', '');
   const { account } = state;
   const timestamp = new Date().toLocaleTimeString();
+  const lev = account.leverage || 3;
 
-  if (action === 'BUY') {
-    if (account.holdings[coin]) return;
-    const allocation = account.balance * (account.riskPerTradePercent / 100);
-    if (allocation < 10) return;
-
-    const amount = allocation / price;
-    account.balance -= allocation;
-    account.holdings[coin] = {
-      amount,
-      avgPrice: price,
-      boughtAt: timestamp
-    };
-    account.tradeHistory.unshift({
-      id: Date.now(),
-      symbol,
-      type: 'BUY',
-      price,
-      amount,
-      time: timestamp,
-      pnl: 0,
-      pnlPercent: 0
-    });
-    console.log(`[TRADE BUY] ${symbol} | Qty: ${amount.toFixed(4)} @ $${price}`);
-  } else if (action === 'SELL') {
-    if (!account.holdings[coin]) return;
-    const pos = account.holdings[coin];
-    const totalReturn = pos.amount * price;
-    const cost = pos.amount * pos.avgPrice;
-    const pnl = totalReturn - cost;
-    const pnlPercent = ((pnl / cost) * 100).toFixed(2);
-
-    account.balance += totalReturn;
-    account.totalTrades++;
-    if (pnl > 0) account.winningTrades++;
-
-    account.tradeHistory.unshift({
-      id: Date.now(),
-      symbol,
-      type: 'SELL',
-      price,
-      amount: pos.amount,
-      time: timestamp,
-      pnl: Number(pnl.toFixed(2)),
-      pnlPercent: Number(pnlPercent)
-    });
-    delete account.holdings[coin];
-    console.log(`[TRADE SELL] ${symbol} | Price: $${price} | PnL: $${pnl.toFixed(2)} (${pnlPercent}%)`);
+  // Allocate margin percentage
+  const marginAlloc = account.balance * (account.riskPerTradePercent / 100);
+  if (marginAlloc < 10 || account.balance < marginAlloc) {
+    console.log(`[FUTURES SKIP] Insufficient margin balance ($${account.balance.toFixed(2)}) for ${symbol}`);
+    return;
   }
 
+  const positionNotional = marginAlloc * lev;
+  const amount = positionNotional / price;
+  account.balance -= marginAlloc;
+
+  // Conservative Liquidation Price Calculation
+  // LONG Liq = Entry * (1 - (1 / Leverage) * 0.9)
+  // SHORT Liq = Entry * (1 + (1 / Leverage) * 0.9)
+  const liqDistance = (1 / lev) * 0.9;
+  const liqPrice = side === 'LONG' ? price * (1 - liqDistance) : price * (1 + liqDistance);
+
+  account.positions[coin] = {
+    symbol,
+    side, // 'LONG' or 'SHORT'
+    amount,
+    entryPrice: price,
+    margin: marginAlloc,
+    leverage: lev,
+    liqPrice: Number(liqPrice.toFixed(4)),
+    openedAt: timestamp,
+    reason
+  };
+
+  account.tradeHistory.unshift({
+    id: Date.now(),
+    symbol,
+    side,
+    action: `OPEN ${side} (${lev}x)`,
+    price,
+    amount,
+    margin: Number(marginAlloc.toFixed(2)),
+    leverage: lev,
+    time: timestamp,
+    pnl: 0,
+    pnlPercent: 0,
+    reason
+  });
   if (account.tradeHistory.length > 50) account.tradeHistory.pop();
+
+  console.log(`[FUTURES OPEN] ${side} ${symbol} | Notional: $${positionNotional.toFixed(2)} (${lev}x) | Margin: $${marginAlloc.toFixed(2)} @ $${price}`);
 }
 
 async function runScan() {
-  console.log('--- Starting Cloud Scanner Run ---');
+  console.log('--- Starting 24/7 Futures Cloud Scanner (3x-5x Leverage) ---');
   const state = loadState();
   const { account } = state;
 
@@ -279,7 +319,7 @@ async function runScan() {
         );
 
         if (indicator) {
-          console.log(`[${symbol}] Price: $${currentPrice} | Mode: ${account.chartMode} | Color: ${indicator.currColor} | Signal: ${indicator.signal}`);
+          console.log(`[${symbol}] Price: $${currentPrice} | Color: ${indicator.currColor.toUpperCase()} | Signal: ${indicator.signal}`);
 
           if (!state.marketScan) state.marketScan = {};
           state.marketScan[symbol] = {
@@ -292,42 +332,83 @@ async function runScan() {
           };
 
           const coin = symbol.replace('USDT', '');
-          const isHolding = !!account.holdings[coin];
+          const currentPos = account.positions[coin];
 
-          // Auto-Exit Rule: Sell / Close position if explicit SELL flip OR if held coin turns Red
-          const shouldExit = isHolding && (indicator.signal === 'SELL' || indicator.currColor === 'red');
-          // Entry Rule: Buy if explicit BUY signal and not currently holding
-          const shouldEnter = !isHolding && indicator.signal === 'BUY';
+          // ═════════════════════════════════════════════════════════════════
+          // POSITION FLIP STRATEGY (Longs and Shorts on Color Flips)
+          // ═════════════════════════════════════════════════════════════════
 
-          if (shouldExit) {
-            console.log(`[EXIT TRIGGER] Closing ${symbol} position because candle is ${indicator.currColor.toUpperCase()}`);
+          // 1. If currently in LONG and signal turns RED:
+          // Close LONG position and flip immediately into SHORT!
+          if (currentPos && currentPos.side === 'LONG' && (indicator.currColor === 'red' || indicator.signal === 'SELL')) {
+            console.log(`[POSITION FLIP] ${symbol} turned RED -> Closing LONG & Flipping to SHORT`);
             state.recentSignals.unshift({
               symbol,
-              signal: 'SELL',
+              signal: 'SELL / SHORT',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
               mode: account.chartMode,
-              reason: `Candle turned ${indicator.currColor.toUpperCase()} [Auto-Exit]`
+              reason: 'Color flipped RED [Futures Short Flip]'
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'SELL', currentPrice);
+              closeFuturesPosition(state, symbol, currentPrice, 'Flipped to RED');
+              openFuturesPosition(state, symbol, 'SHORT', currentPrice, 'Color Flipped RED');
             }
-          } else if (shouldEnter) {
-            console.log(`[ENTRY TRIGGER] Opening ${symbol} LONG position on GREEN color flip`);
+          }
+          // 2. If currently in SHORT and signal turns GREEN:
+          // Close SHORT position and flip immediately into LONG!
+          else if (currentPos && currentPos.side === 'SHORT' && (indicator.currColor === 'green' || indicator.signal === 'BUY')) {
+            console.log(`[POSITION FLIP] ${symbol} turned GREEN -> Closing SHORT & Flipping to LONG`);
             state.recentSignals.unshift({
               symbol,
-              signal: 'BUY',
+              signal: 'BUY / LONG',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
               mode: account.chartMode,
-              reason: `Green Candle Entry`
+              reason: 'Color flipped GREEN [Futures Long Flip]'
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'BUY', currentPrice);
+              closeFuturesPosition(state, symbol, currentPrice, 'Flipped to GREEN');
+              openFuturesPosition(state, symbol, 'LONG', currentPrice, 'Color Flipped GREEN');
+            }
+          }
+          // 3. If NO active position:
+          // Enter on fresh Green (LONG) or fresh Red (SHORT) signal
+          else if (!currentPos) {
+            if (indicator.signal === 'BUY' || indicator.currColor === 'green') {
+              console.log(`[FUTURES ENTRY] Opening new LONG contract on ${symbol}`);
+              state.recentSignals.unshift({
+                symbol,
+                signal: 'BUY / LONG',
+                price: currentPrice,
+                time: new Date().toLocaleTimeString(),
+                mode: account.chartMode,
+                reason: 'Green Candle Entry'
+              });
+              if (state.recentSignals.length > 30) state.recentSignals.pop();
+
+              if (account.autoTradingEnabled) {
+                openFuturesPosition(state, symbol, 'LONG', currentPrice, 'Green Entry');
+              }
+            } else if (indicator.signal === 'SELL' || indicator.currColor === 'red') {
+              console.log(`[FUTURES ENTRY] Opening new SHORT contract on ${symbol}`);
+              state.recentSignals.unshift({
+                symbol,
+                signal: 'SELL / SHORT',
+                price: currentPrice,
+                time: new Date().toLocaleTimeString(),
+                mode: account.chartMode,
+                reason: 'Red Candle Entry'
+              });
+              if (state.recentSignals.length > 30) state.recentSignals.pop();
+
+              if (account.autoTradingEnabled) {
+                openFuturesPosition(state, symbol, 'SHORT', currentPrice, 'Red Entry');
+              }
             }
           }
         }
@@ -338,7 +419,7 @@ async function runScan() {
   }
 
   saveState(state);
-  console.log('--- Cloud Scanner Run Completed ---');
+  console.log('--- 24/7 Futures Cloud Scanner Completed ---');
 }
 
 runScan();
