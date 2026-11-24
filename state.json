@@ -1,9 +1,26 @@
 {
   "account": {
     "initialBalance": 10000,
-    "balance": 10000,
-    "holdings": {},
-    "tradeHistory": [],
+    "balance": 8800,
+    "holdings": {
+      "ADA": {
+        "amount": 8010.68090787717,
+        "avgPrice": 0.1498,
+        "boughtAt": "5:51:45 AM"
+      }
+    },
+    "tradeHistory": [
+      {
+        "id": 1795499505141,
+        "symbol": "ADAUSDT",
+        "type": "BUY",
+        "price": 0.1498,
+        "amount": 8010.68090787717,
+        "time": "5:51:45 AM",
+        "pnl": 0,
+        "pnlPercent": 0
+      }
+    ],
     "totalTrades": 0,
     "winningTrades": 0,
     "autoTradingEnabled": true,
@@ -15,6 +32,13 @@
   },
   "recentSignals": [
     {
+      "symbol": "ADAUSDT",
+      "signal": "BUY",
+      "price": 0.1498,
+      "time": "5:51:45 AM",
+      "mode": "Line Break Style"
+    },
+    {
       "symbol": "ETHUSDT",
       "signal": "SELL",
       "price": 1707.88,
@@ -22,5 +46,5 @@
       "mode": "Line Break Style"
     }
   ],
-  "lastUpdated": "2026-11-24T05:50:14.647Z"
+  "lastUpdated": "2026-11-24T05:51:45.437Z"
 }
