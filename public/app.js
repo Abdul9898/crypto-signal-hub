@@ -101,11 +101,11 @@ async function updateDashboard() {
       console.warn('Ticker fetch error:', e);
     }
 
-    // Run Real-Time 1m Pine Script Indicator Directly in Browser for every coin
+    // Run Real-Time 15m Pine Script Indicator Directly in Browser for every coin
     const marketScanResults = [];
     for (const sym of SYMBOLS) {
       try {
-        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=1m&limit=150`);
+        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=15m&limit=150`);
         const klines = await klineRes.json();
         const ind = calculatePineIndicator(klines, account.brickMultiplier || 0.5, account.atrPeriod || 14);
         if (ind) {

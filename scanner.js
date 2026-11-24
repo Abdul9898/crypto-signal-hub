@@ -25,7 +25,7 @@ let defaultState = {
     chartMode: "Line Break Style",
     brickMultiplier: 0.5,
     atrPeriod: 14,
-    timeframe: "1m"
+    timeframe: "15m"
   },
   marketScan: {},
   recentSignals: [],
