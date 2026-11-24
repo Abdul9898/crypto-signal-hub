@@ -7,9 +7,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STATE_FILE = path.join(__dirname, 'state.json');
 
+// High-Volatility Scalping Pairs for Continuous Trade Flow
 const SYMBOLS = [
   'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 
-  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'
+  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT',
+  'PEPEUSDT', 'SHIBUSDT', 'NEARUSDT', 'SUIUSDT'
 ];
 
 let defaultState = {
@@ -21,11 +23,11 @@ let defaultState = {
     totalTrades: 0,
     winningTrades: 0,
     autoTradingEnabled: true,
-    riskPerTradePercent: 12,
+    riskPerTradePercent: 10,
     chartMode: "Line Break Style",
     brickMultiplier: 0.5,
     atrPeriod: 14,
-    timeframe: "15m"
+    timeframe: "3m" // Fast 3-Minute Scalper for continuous action
   },
   marketScan: {},
   recentSignals: [],
@@ -37,10 +39,11 @@ function loadState() {
     if (fs.existsSync(STATE_FILE)) {
       const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
       if (!data.account.holdings) data.account.holdings = {};
+      data.account.timeframe = '3m'; // Ensure fast 3m scalping timeframe
       return data;
     }
   } catch (e) {
-    console.error('Error loading state, using default:', e);
+    console.error('Error loading state:', e);
   }
   return defaultState;
 }
@@ -49,7 +52,6 @@ function saveState(state) {
   try {
     state.lastUpdated = new Date().toISOString();
     fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf8');
-    console.log(`Saved state to ${STATE_FILE} at ${state.lastUpdated}`);
   } catch (e) {
     console.error('Failed to save state:', e);
   }
@@ -57,7 +59,7 @@ function saveState(state) {
 
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubSpot/1.0' } }, (res) => {
+    https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubScalper/1.0' } }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -71,10 +73,6 @@ function fetchJSON(url) {
   });
 }
 
-// ----------------------------------------------------------------------
-// 100% PURE PINESCRIPT TRANSLATION: "All Charts · Sadeeq_Trading"
-// Options: Normal, Heikin Ashi, Wickless, Renko Style, Line Break Style
-// ----------------------------------------------------------------------
 function calculateATR(highs, lows, closes, period = 14) {
   const len = closes.length;
   if (len < period + 1) return 1;
@@ -189,12 +187,6 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
   };
 }
 
-// ----------------------------------------------------------------------
-// YESTERDAY'S PROVEN SPOT STRATEGY:
-// 1. Enter LONG on Green candle or Green Color Flip
-// 2. CLOSE / SHORT on Red candle immediately to lock in profit / cut loss
-// ----------------------------------------------------------------------
-
 function executePaperTrade(state, symbol, action, price, reason = '') {
   const coin = symbol.replace('USDT', '');
   const { account } = state;
@@ -203,7 +195,7 @@ function executePaperTrade(state, symbol, action, price, reason = '') {
   if (action === 'BUY' || action === 'LONG') {
     if (account.holdings[coin]) return;
     const allocation = account.balance * (account.riskPerTradePercent / 100);
-    if (allocation < 15 || account.balance < allocation) return;
+    if (allocation < 10 || account.balance < allocation) return;
 
     const amount = allocation / price;
     account.balance -= allocation;
@@ -227,7 +219,7 @@ function executePaperTrade(state, symbol, action, price, reason = '') {
       pnlPercent: 0,
       reason
     });
-    console.log(`[TRADE BUY] LONG ${symbol} | Qty: ${amount.toFixed(4)} @ $${price}`);
+    console.log(`[SCALP BUY] LONG ${symbol} | Qty: ${amount.toFixed(4)} @ $${price}`);
   } else if (action === 'SELL' || action === 'SHORT') {
     if (!account.holdings[coin]) return;
     const pos = account.holdings[coin];
@@ -254,15 +246,13 @@ function executePaperTrade(state, symbol, action, price, reason = '') {
       reason
     });
     delete account.holdings[coin];
-    console.log(`[TRADE SELL] CLOSE / SHORT ${symbol} @ $${price} | PnL: $${pnl.toFixed(2)} (${pnlPercent}%)`);
+    console.log(`[SCALP CLOSE] ${symbol} @ $${price} | PnL: $${pnl.toFixed(2)} (${pnlPercent}%)`);
   }
 
   if (account.tradeHistory.length > 50) account.tradeHistory.pop();
 }
 
-async function runScan() {
-  console.log('--- Starting 24/7 Spot Scanner (Yesterday Proven Rule: 15m) ---');
-  const state = loadState();
+async function scanOnce(state) {
   const { account } = state;
 
   for (const symbol of SYMBOLS) {
@@ -285,8 +275,6 @@ async function runScan() {
         );
 
         if (indicator) {
-          console.log(`[${symbol}] Price: $${currentPrice} | Color: ${indicator.currColor.toUpperCase()} | Signal: ${indicator.signal}`);
-
           if (!state.marketScan) state.marketScan = {};
           state.marketScan[symbol] = {
             symbol,
@@ -300,54 +288,70 @@ async function runScan() {
           const coin = symbol.replace('USDT', '');
           const isHolding = !!account.holdings[coin];
 
-          // 1. Should Exit: If held coin turns RED (protect profit & prevent drawdowns)
+          // Auto-Exit: Close position if coin turns Red or fires Sell flip
           const shouldExit = isHolding && (indicator.currColor === 'red' || indicator.signal === 'SELL');
-
-          // 2. Should Enter: If coin is GREEN and we do not hold it yet
-          const shouldEnter = !isHolding && (indicator.signal === 'BUY' || indicator.currColor === 'green');
+          // Scalp Entry: Enter on fresh Green flip or green candle if under 6 concurrent holdings
+          const openHoldingsCount = Object.keys(account.holdings).length;
+          const shouldEnter = !isHolding && openHoldingsCount < 6 && (indicator.signal === 'BUY' || indicator.currColor === 'green');
 
           if (shouldExit) {
-            console.log(`[EXIT TRIGGER] Red Candle Exit on ${symbol}`);
+            console.log(`[SCALP EXIT] ${symbol} Red Flip`);
             state.recentSignals.unshift({
               symbol,
               signal: 'SHORT',
               action: 'SHORT',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
-              mode: account.chartMode,
-              reason: `Red Candle Exit [${account.chartMode}]`
+              mode: `${account.timeframe} Scalp`,
+              reason: `Red Candle Exit [${account.timeframe}]`
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'SELL', currentPrice, 'Red Candle Exit');
+              executePaperTrade(state, symbol, 'SELL', currentPrice, 'Red Scalp Exit');
             }
           } else if (shouldEnter) {
-            console.log(`[ENTRY TRIGGER] Green Candle Entry on ${symbol}`);
+            console.log(`[SCALP ENTRY] ${symbol} Green Flip`);
             state.recentSignals.unshift({
               symbol,
               signal: 'LONG',
               action: 'LONG',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
-              mode: account.chartMode,
-              reason: `Green Candle Entry [${account.chartMode}]`
+              mode: `${account.timeframe} Scalp`,
+              reason: `Green Candle Entry [${account.timeframe}]`
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'BUY', currentPrice, 'Green Candle Entry');
+              executePaperTrade(state, symbol, 'BUY', currentPrice, 'Green Scalp Entry');
             }
           }
         }
       }
     } catch (err) {
-      console.error(`Error processing ${symbol}:`, err.message);
+      // Quiet fail on network hiccups
     }
   }
 
   saveState(state);
-  console.log('--- 24/7 Spot Scanner Completed ---');
 }
 
-runScan();
+// Multi-Cycle Execution: Runs multiple scan cycles in each runner session
+async function runHighFrequencyRunner() {
+  console.log('--- Starting 3m High-Frequency Scalper Runner ---');
+  const state = loadState();
+  
+  // Perform 4 continuous sweeps spaced by 12 seconds during the runner run
+  for (let cycle = 1; cycle <= 4; cycle++) {
+    console.log(`[Cycle ${cycle}/4] Running market sweep...`);
+    await scanOnce(state);
+    if (cycle < 4) {
+      await new Promise(r => setTimeout(r, 12000));
+    }
+  }
+
+  console.log('--- 3m High-Frequency Scalper Run Completed ---');
+}
+
+runHighFrequencyRunner();

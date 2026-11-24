@@ -1,7 +1,7 @@
 {
   "account": {
     "initialBalance": 10000,
-    "balance": 4086.755963699201,
+    "balance": 4715.720378980727,
     "holdings": {
       "BTC": {
         "amount": 0.019893084616727397,
@@ -28,11 +28,6 @@
         "avgPrice": 0.05586,
         "boughtAt": "1:03:21 PM"
       },
-      "ADA": {
-        "amount": 4313.884878474115,
-        "avgPrice": 0.1468,
-        "boughtAt": "1:03:23 PM"
-      },
       "XRP": {
         "amount": 597.8168892306373,
         "avgPrice": 0.9322,
@@ -40,6 +35,19 @@
       }
     },
     "tradeHistory": [
+      {
+        "id": 1795523924989,
+        "symbol": "ADAUSDT",
+        "type": "CLOSE / SHORT",
+        "action": "CLOSE / SHORT",
+        "price": 0.1458,
+        "amount": 4313.8849,
+        "totalUSDT": 628.96,
+        "time": "1:38:44 PM",
+        "pnl": -4.31,
+        "pnlPercent": -0.68,
+        "reason": "Red Scalp Exit"
+      },
       {
         "id": 1795521806340,
         "symbol": "XRPUSDT",
@@ -132,16 +140,25 @@
         "reason": "Green Candle Entry"
       }
     ],
-    "totalTrades": 7,
+    "totalTrades": 8,
     "winningTrades": 0,
     "autoTradingEnabled": true,
     "riskPerTradePercent": 12,
     "chartMode": "Line Break Style",
     "brickMultiplier": 0.5,
     "atrPeriod": 14,
-    "timeframe": "15m"
+    "timeframe": "3m"
   },
   "recentSignals": [
+    {
+      "symbol": "ADAUSDT",
+      "signal": "SHORT",
+      "action": "SHORT",
+      "price": 0.1458,
+      "time": "1:38:43 PM",
+      "mode": "3m Scalp",
+      "reason": "Red Candle Exit [3m]"
+    },
     {
       "symbol": "XRPUSDT",
       "signal": "LONG",
@@ -209,68 +226,100 @@
   "marketScan": {
     "BTCUSDT": {
       "symbol": "BTCUSDT",
-      "price": 60322.47,
+      "price": 60417.78,
       "candleColor": "green",
-      "brickSize": "139.5381",
-      "atr": "279.0762",
+      "brickSize": "56.0798",
+      "atr": "112.1596",
       "signal": "HOLD"
     },
     "ETHUSDT": {
       "symbol": "ETHUSDT",
-      "price": 1699.84,
+      "price": 1701.75,
       "candleColor": "green",
-      "brickSize": "4.2968",
-      "atr": "8.5936",
+      "brickSize": "1.7656",
+      "atr": "3.5312",
       "signal": "HOLD"
     },
     "SOLUSDT": {
       "symbol": "SOLUSDT",
-      "price": 70.83,
+      "price": 70.7,
       "candleColor": "green",
-      "brickSize": "0.1900",
-      "atr": "0.3800",
+      "brickSize": "0.0774",
+      "atr": "0.1549",
       "signal": "HOLD"
     },
     "BNBUSDT": {
       "symbol": "BNBUSDT",
-      "price": 550.53,
+      "price": 550.76,
       "candleColor": "green",
-      "brickSize": "1.1138",
-      "atr": "2.2275",
+      "brickSize": "0.4332",
+      "atr": "0.8664",
       "signal": "HOLD"
     },
     "DOGEUSDT": {
       "symbol": "DOGEUSDT",
-      "price": 0.05586,
+      "price": 0.05567,
       "candleColor": "green",
       "brickSize": "0.0001",
-      "atr": "0.0003",
+      "atr": "0.0001",
       "signal": "HOLD"
     },
     "ADAUSDT": {
       "symbol": "ADAUSDT",
-      "price": 0.1468,
-      "candleColor": "green",
-      "brickSize": "0.0004",
-      "atr": "0.0008",
+      "price": 0.1457,
+      "candleColor": "red",
+      "brickSize": "0.0002",
+      "atr": "0.0004",
       "signal": "HOLD"
     },
     "XRPUSDT": {
       "symbol": "XRPUSDT",
-      "price": 0.9322,
+      "price": 0.9287,
       "candleColor": "green",
-      "brickSize": "0.0024",
-      "atr": "0.0048",
+      "brickSize": "0.0009",
+      "atr": "0.0018",
       "signal": "HOLD"
     },
     "AVAXUSDT": {
       "symbol": "AVAXUSDT",
-      "price": 6.73,
-      "candleColor": "red",
-      "brickSize": "0.0179",
-      "atr": "0.0357",
-      "signal": "SELL"
+      "price": 6.708,
+      "candleColor": "green",
+      "brickSize": "0.0076",
+      "atr": "0.0152",
+      "signal": "HOLD"
+    },
+    "PEPEUSDT": {
+      "symbol": "PEPEUSDT",
+      "price": 0.00000345,
+      "candleColor": "green",
+      "brickSize": "0.0000",
+      "atr": "0.0000",
+      "signal": "HOLD"
+    },
+    "SHIBUSDT": {
+      "symbol": "SHIBUSDT",
+      "price": 0.00000358,
+      "candleColor": "green",
+      "brickSize": "0.0000",
+      "atr": "0.0000",
+      "signal": "BUY"
+    },
+    "NEARUSDT": {
+      "symbol": "NEARUSDT",
+      "price": 2.906,
+      "candleColor": "green",
+      "brickSize": "0.0051",
+      "atr": "0.0102",
+      "signal": "HOLD"
+    },
+    "SUIUSDT": {
+      "symbol": "SUIUSDT",
+      "price": 0.6566,
+      "candleColor": "green",
+      "brickSize": "0.0008",
+      "atr": "0.0017",
+      "signal": "BUY"
     }
   },
-  "lastUpdated": "2026-11-24T12:03:29.456Z"
+  "lastUpdated": "2026-11-24T12:43:48.766Z"
 }

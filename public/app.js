@@ -1,5 +1,9 @@
-// Client-Side Real-Time TradingView Engine & Dashboard Controller
-const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
+// Client-Side Real-Time TradingView Engine & Scalping Controller
+const SYMBOLS = [
+  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 
+  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT',
+  'PEPEUSDT', 'SHIBUSDT', 'NEARUSDT', 'SUIUSDT'
+];
 
 // Pure Pine Script math: "All Charts · Sadeeq_Trading"
 function calculatePineIndicator(klines, brickMultiplier = 0.5, atrLen = 14) {
@@ -11,7 +15,6 @@ function calculatePineIndicator(klines, brickMultiplier = 0.5, atrLen = 14) {
   const closes = klines.map(d => parseFloat(d[4]));
   const len = closes.length;
 
-  // Exact TradingView RMA Wilder ATR
   const tr = [highs[0] - lows[0]];
   for (let i = 1; i < len; i++) {
     tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
@@ -97,11 +100,11 @@ async function updateDashboard() {
       console.warn('Ticker fetch error:', e);
     }
 
-    // Run Real-Time 15m Pine Script Indicator
+    // Run Real-Time 3m High-Frequency Pine Script Indicator
     const marketScanResults = [];
     for (const sym of SYMBOLS) {
       try {
-        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=15m&limit=150`);
+        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=3m&limit=150`);
         const klines = await klineRes.json();
         const ind = calculatePineIndicator(klines, account.brickMultiplier || 0.5, account.atrPeriod || 14);
         if (ind) {
@@ -153,7 +156,7 @@ async function updateDashboard() {
     const profitPercent = ((netProfit / (account.initialBalance || 10000)) * 100).toFixed(2);
     const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
 
-    // 1. Update Portfolio Metric Cards
+    // 1. Metric Cards
     document.getElementById('val-portfolio').textContent = `$${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-cash').textContent = `Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
     
@@ -180,7 +183,7 @@ async function updateDashboard() {
             <tr>
               <td><span class="coin-badge">${h.coin}</span></td>
               <td>${h.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${h.coin}</td>
-              <td class="price-text">$${h.avgPrice.toFixed(4)}</td>
+              <td class="price-text">$${h.avgPrice >= 1 ? h.avgPrice.toFixed(4) : h.avgPrice.toFixed(6)}</td>
               <td class="price-text">$${h.val.toFixed(2)}</td>
               <td class="${pnlClass}"><strong>${pnlSign}$${h.unrealizedPnl.toFixed(2)} (${pnlSign}${h.unrealizedPnlPct}%)</strong></td>
             </tr>
@@ -205,10 +208,10 @@ async function updateDashboard() {
         return `
           <tr>
             <td><span class="coin-badge">${item.symbol}</span></td>
-            <td class="price-text">$${price >= 1 ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : price.toFixed(5)}</td>
+            <td class="price-text">$${price >= 1 ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : price.toFixed(6)}</td>
             <td class="${changeClass}">${changeSign}${item.priceChangePercent.toFixed(2)}%</td>
             <td><span class="state-tag ${stateColor}">${item.candleColor}</span></td>
-            <td class="price-text">$${Number(item.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+            <td class="price-text">$${Number(item.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
             <td><span class="signal-tag ${actionClass}">${item.actionBadge}</span></td>
           </tr>
         `;
@@ -227,7 +230,7 @@ async function updateDashboard() {
             <div class="feed-item">
               <div class="feed-desc">
                 <strong>${sig.symbol} · ${actionText}</strong>
-                <span class="feed-sub">${sig.reason || (sig.time + ' · Line Break Style')}</span>
+                <span class="feed-sub">${sig.reason || (sig.time + ' · 3m Scalp')}</span>
               </div>
               <div style="text-align: right;">
                 <span class="signal-tag ${badgeClass}">${actionText}</span>
@@ -237,11 +240,11 @@ async function updateDashboard() {
           `;
         }).join('');
       } else {
-        signalList.innerHTML = `<div class="empty-state">Waiting for color flip trigger...</div>`;
+        signalList.innerHTML = `<div class="empty-state">Waiting for scalp trigger...</div>`;
       }
     }
 
-    // 5. Render Paper Trading Execution Log (Clean Display - No Undefined)
+    // 5. Render Paper Trading Execution Log
     const tradeList = document.getElementById('trade-list');
     const tradeHistory = account.tradeHistory || [];
     if (tradeList) {
@@ -278,6 +281,6 @@ async function updateDashboard() {
   }
 }
 
-// Live update every 4 seconds
+// Live update every 3 seconds directly on your screen
 updateDashboard();
-setInterval(updateDashboard, 4000);
+setInterval(updateDashboard, 3000);
