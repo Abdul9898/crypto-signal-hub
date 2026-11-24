@@ -2,17 +2,11 @@ import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { SYMBOLS, DEFAULT_CHART_MODE, processIndicator } from './indicators.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const STATE_FILE = path.join(__dirname, 'state.json');
-
-// High-Volatility Scalping Pairs for Continuous Trade Flow
-const SYMBOLS = [
-  'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 
-  'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT',
-  'PEPEUSDT', 'SHIBUSDT', 'NEARUSDT', 'SUIUSDT'
-];
 
 let defaultState = {
   account: {
@@ -23,11 +17,13 @@ let defaultState = {
     totalTrades: 0,
     winningTrades: 0,
     autoTradingEnabled: true,
-    riskPerTradePercent: 10,
-    chartMode: "Line Break Style",
+    riskPerTradePercent: 12,
+    chartMode: DEFAULT_CHART_MODE,
     brickMultiplier: 0.5,
     atrPeriod: 14,
-    timeframe: "3m" // Fast 3-Minute Scalper for continuous action
+    superTrendFactor: 2.0,
+    superTrendAtrLen: 10,
+    timeframe: '3m'
   },
   marketScan: {},
   recentSignals: [],
@@ -38,8 +34,12 @@ function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
       const data = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      if (!data.account) data.account = { ...defaultState.account };
       if (!data.account.holdings) data.account.holdings = {};
-      data.account.timeframe = '3m'; // Ensure fast 3m scalping timeframe
+      if (!data.account.chartMode) data.account.chartMode = DEFAULT_CHART_MODE;
+      if (!data.account.superTrendFactor) data.account.superTrendFactor = 2.0;
+      if (!data.account.superTrendAtrLen) data.account.superTrendAtrLen = 10;
+      if (!data.account.timeframe) data.account.timeframe = '3m';
       return data;
     }
   } catch (e) {
@@ -57,9 +57,9 @@ function saveState(state) {
   }
 }
 
-function fetchJSON(url) {
+function fetchJSON(url, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
-    https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubScalper/1.0' } }, (res) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'CryptoSignalHubScalper/2.0' } }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -69,122 +69,10 @@ function fetchJSON(url) {
           reject(e);
         }
       });
-    }).on('error', reject);
+    });
+    req.setTimeout(timeoutMs, () => req.destroy(new Error(`Timeout after ${timeoutMs}ms`)));
+    req.on('error', reject);
   });
-}
-
-function calculateATR(highs, lows, closes, period = 14) {
-  const len = closes.length;
-  if (len < period + 1) return 1;
-  const tr = [highs[0] - lows[0]];
-  for (let i = 1; i < len; i++) {
-    tr.push(Math.max(
-      highs[i] - lows[i],
-      Math.abs(highs[i] - closes[i - 1]),
-      Math.abs(lows[i] - closes[i - 1])
-    ));
-  }
-  let sum = 0;
-  for (let i = 0; i < period; i++) sum += tr[i];
-  let atr = sum / period;
-  for (let i = period; i < len; i++) {
-    atr = (atr * (period - 1) + tr[i]) / period;
-  }
-  return atr;
-}
-
-function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break Style", brickMultiplier = 0.5, atrLen = 14) {
-  const len = closes.length;
-  if (len < atrLen + 2) return null;
-
-  const atrVal = calculateATR(highs, lows, closes, atrLen);
-  const brick = atrVal * brickMultiplier;
-
-  let cOpen = [];
-  let cClose = [];
-
-  if (mode === "Normal") {
-    cOpen = opens;
-    cClose = closes;
-  } else if (mode === "Heikin Ashi") {
-    let haOpen = (opens[0] + closes[0]) / 2.0;
-    for (let i = 0; i < len; i++) {
-      const haClose = (opens[i] + highs[i] + lows[i] + closes[i]) / 4.0;
-      if (i > 0) {
-        haOpen = (haOpen + cClose[i - 1]) / 2.0;
-      }
-      cOpen.push(haOpen);
-      cClose.push(haClose);
-    }
-  } else if (mode === "Wickless") {
-    for (let i = 0; i < len; i++) {
-      const prevClose = i > 0 ? closes[i - 1] : opens[0];
-      const curClose = closes[i];
-      cOpen.push(prevClose);
-      cClose.push(curClose);
-    }
-  } else if (mode === "Renko Style") {
-    let rClose = closes[0];
-    let rOpen = closes[0];
-    for (let i = 0; i < len; i++) {
-      const cur = closes[i];
-      const prevRClose = rClose;
-      if (cur >= prevRClose + brick) {
-        rClose = prevRClose + brick;
-      } else if (cur <= prevRClose - brick) {
-        rClose = prevRClose - brick;
-      }
-      if (rClose !== prevRClose) {
-        rOpen = prevRClose;
-      }
-      cOpen.push(rOpen);
-      cClose.push(rClose);
-    }
-  } else {
-    // 5 · LINE BREAK STYLE (Exact Pine Script)
-    let lbClose = closes[0];
-    let lbOpen = closes[0];
-    for (let i = 0; i < len; i++) {
-      const cur = closes[i];
-      const prevLbClose = lbClose;
-      if (Math.abs(cur - prevLbClose) >= brick) {
-        lbClose = cur;
-      }
-      if (lbClose !== prevLbClose) {
-        lbOpen = prevLbClose;
-      }
-      cOpen.push(lbOpen);
-      cClose.push(lbClose);
-    }
-  }
-
-  const isUp = [];
-  for (let i = 0; i < len; i++) {
-    isUp.push(cClose[i] >= cOpen[i]);
-  }
-
-  const lastIdx = len - 1;
-  const prevIdx = len - 2;
-
-  const longSig = isUp[lastIdx] && !isUp[prevIdx];
-  const shortSig = !isUp[lastIdx] && isUp[prevIdx];
-
-  const currColor = isUp[lastIdx] ? 'green' : 'red';
-  const prevColor = isUp[prevIdx] ? 'green' : 'red';
-
-  let signal = 'HOLD';
-  if (longSig) signal = 'BUY';
-  else if (shortSig) signal = 'SELL';
-
-  return {
-    signal,
-    currColor,
-    prevColor,
-    longSig,
-    shortSig,
-    brick: brick.toFixed(4),
-    atr: atrVal.toFixed(4)
-  };
 }
 
 function executePaperTrade(state, symbol, action, price, reason = '') {
@@ -257,7 +145,7 @@ async function scanOnce(state) {
 
   for (const symbol of SYMBOLS) {
     try {
-      const klineUrl = `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${account.timeframe}&limit=100`;
+      const klineUrl = `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${account.timeframe}&limit=150`;
       const data = await fetchJSON(klineUrl);
 
       if (Array.isArray(data) && data.length > 20) {
@@ -267,12 +155,13 @@ async function scanOnce(state) {
         const closes = data.map(d => parseFloat(d[4]));
         const currentPrice = closes[closes.length - 1];
 
-        const indicator = processSadeeqIndicator(
-          opens, highs, lows, closes, 
-          account.chartMode, 
-          account.brickMultiplier, 
-          account.atrPeriod
-        );
+        const indicator = processIndicator(opens, highs, lows, closes, {
+          mode: account.chartMode,
+          brickMultiplier: account.brickMultiplier,
+          atrLen: account.atrPeriod,
+          superTrendFactor: account.superTrendFactor || 2.0,
+          superTrendAtrLen: account.superTrendAtrLen || 10
+        });
 
         if (indicator) {
           if (!state.marketScan) state.marketScan = {};
@@ -281,68 +170,69 @@ async function scanOnce(state) {
             price: currentPrice,
             candleColor: indicator.currColor,
             brickSize: indicator.brick,
+            stopLevel: indicator.stopLevel,
             atr: indicator.atr,
-            signal: indicator.signal
+            signal: indicator.signal,
+            mode: account.chartMode
           };
 
           const coin = symbol.replace('USDT', '');
           const isHolding = !!account.holdings[coin];
 
-          // Auto-Exit: Close position if coin turns Red or fires Sell flip
+          // Auto-Exit: Close position if trend flips red or fires SELL
           const shouldExit = isHolding && (indicator.currColor === 'red' || indicator.signal === 'SELL');
-          // Scalp Entry: Enter on fresh Green flip or green candle if under 6 concurrent holdings
+          // Entry: Open LONG on green impulse/flip while under 6 concurrent holdings
           const openHoldingsCount = Object.keys(account.holdings).length;
           const shouldEnter = !isHolding && openHoldingsCount < 6 && (indicator.signal === 'BUY' || indicator.currColor === 'green');
 
           if (shouldExit) {
-            console.log(`[SCALP EXIT] ${symbol} Red Flip`);
+            console.log(`[EXIT] ${symbol} Red Flip [${account.chartMode}]`);
             state.recentSignals.unshift({
               symbol,
               signal: 'SHORT',
               action: 'SHORT',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
-              mode: `${account.timeframe} Scalp`,
-              reason: `Red Candle Exit [${account.timeframe}]`
+              mode: `${account.timeframe} · ${account.chartMode}`,
+              reason: `Red Impulse Exit [${account.chartMode}]`
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'SELL', currentPrice, 'Red Scalp Exit');
+              executePaperTrade(state, symbol, 'SELL', currentPrice, `Red Exit [${account.chartMode}]`);
             }
           } else if (shouldEnter) {
-            console.log(`[SCALP ENTRY] ${symbol} Green Flip`);
+            console.log(`[ENTRY] ${symbol} Green Flip [${account.chartMode}]`);
             state.recentSignals.unshift({
               symbol,
               signal: 'LONG',
               action: 'LONG',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
-              mode: `${account.timeframe} Scalp`,
-              reason: `Green Candle Entry [${account.timeframe}]`
+              mode: `${account.timeframe} · ${account.chartMode}`,
+              reason: `Green Impulse Entry [${account.chartMode}]`
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, 'BUY', currentPrice, 'Green Scalp Entry');
+              executePaperTrade(state, symbol, 'BUY', currentPrice, `Green Entry [${account.chartMode}]`);
             }
           }
         }
       }
     } catch (err) {
-      // Quiet fail on network hiccups
+      console.warn(`Error scanning ${symbol}:`, err.message);
     }
   }
 
   saveState(state);
 }
 
-// Multi-Cycle Execution: Runs multiple scan cycles in each runner session
+// Multi-Cycle Execution: Runs 4 continuous sweeps in each runner session
 async function runHighFrequencyRunner() {
-  console.log('--- Starting 3m High-Frequency Scalper Runner ---');
   const state = loadState();
-  
-  // Perform 4 continuous sweeps spaced by 12 seconds during the runner run
+  console.log(`--- Starting ${state.account.timeframe} Runner [${state.account.chartMode}] ---`);
+
   for (let cycle = 1; cycle <= 4; cycle++) {
     console.log(`[Cycle ${cycle}/4] Running market sweep...`);
     await scanOnce(state);
@@ -351,7 +241,7 @@ async function runHighFrequencyRunner() {
     }
   }
 
-  console.log('--- 3m High-Frequency Scalper Run Completed ---');
+  console.log('--- Runner Session Completed ---');
 }
 
 runHighFrequencyRunner();

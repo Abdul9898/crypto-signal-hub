@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CryptoSignal Hub · Sadeeq Trading Indicator Engine</title>
+  <title>CryptoSignal Hub · Wickless SuperTrend & Sadeeq Engine</title>
   <link rel="stylesheet" href="style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -16,15 +16,17 @@
         <div class="logo-pulse">⚡</div>
         <div>
           <h1>CRYPTO SIGNAL HUB</h1>
-          <p class="tagline">POWERED BY SADEEQ_TRADING (NO EMA · LINE BREAK / RENKO COLOR FLIP)</p>
+          <p class="tagline" id="engine-tagline">WICKLESS SUPERTREND + SADEEQ_TRADING ENGINE (NO WICK FAKEOUTS)</p>
         </div>
       </div>
       <div class="header-actions">
         <!-- Chart Mode Selector -->
         <select id="chart-mode-select" class="mode-select">
-          <option value="Line Break Style">Line Break Style (Your Photo)</option>
+          <option value="Wickless SuperTrend">Wickless SuperTrend (Fast Impulse)</option>
+          <option value="Line Break Style">Line Break Style (Original)</option>
           <option value="Renko Style">Renko Style</option>
           <option value="Heikin Ashi">Heikin Ashi</option>
+          <option value="Wickless">Wickless Candles</option>
           <option value="Normal">Normal Candlestick</option>
         </select>
         <button id="toggle-bot-btn" class="bot-btn active">
@@ -66,8 +68,8 @@
       <!-- Left Column: Live Market & Signals -->
       <main class="col-main">
         <div class="card-header">
-          <h2>📊 Live Market Scanner (Sadeeq Color-Flip Engine)</h2>
-          <span class="live-pill"><span class="live-indicator"></span> 3m HIGH-FREQUENCY SCALPER · LIVE 3s TICK</span>
+          <h2>📊 Live Market Scanner (<span id="scanner-mode-label">Wickless SuperTrend</span>)</h2>
+          <span class="live-pill"><span class="live-indicator"></span> 3m HIGH-FREQUENCY SCALPER · LIVE TICK</span>
         </div>
 
         <div class="table-responsive">
@@ -78,13 +80,13 @@
                 <th>PRICE (USDT)</th>
                 <th>24H CHANGE</th>
                 <th>CANDLE STATE</th>
-                <th>BRICK SIZE</th>
+                <th>STOP / BRICK</th>
                 <th>ACTION</th>
               </tr>
             </thead>
             <tbody id="market-tbody">
               <tr>
-                <td colspan="6" class="loading-cell">Scanning Binance markets with Sadeeq indicator...</td>
+                <td colspan="6" class="loading-cell">Scanning Binance markets...</td>
               </tr>
             </tbody>
           </table>
@@ -113,10 +115,10 @@
 
         <!-- Strategy Info Callout -->
         <div class="strategy-banner">
-          <div class="badge">SADEEQ_TRADING RULES</div>
-          <div>
-            <strong>Pure Color-Flip Strategy:</strong>
-            Zero lagging EMA interference. Uses dynamic ATR(14) x 0.5 Line Break bricks. Fires <strong>LONG</strong> when candle turns <strong>Green</strong> and <strong>SHORT / CLOSE</strong> when candle turns <strong>Red</strong>.
+          <div class="badge" id="strategy-badge">WICKLESS SUPERTREND</div>
+          <div id="strategy-desc">
+            <strong>Pure Wickless SuperTrend Engine:</strong>
+            Eliminates stop-hunt wick fakeouts using pure close-to-close bodies (<code>wOpen = close[1]</code>, <code>wClose = close</code>) with dynamic Wilder ATR(10) x 2.0 trailing bands. Fires <strong>LONG</strong> on fast upside breakouts and <strong>SHORT / CLOSE</strong> on trend breakdown.
           </div>
         </div>
       </main>
@@ -146,6 +148,6 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
