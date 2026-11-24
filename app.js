@@ -5,7 +5,7 @@ async function updateDashboard() {
   try {
     let state = null;
 
-    // Try fetching state.json (works on GitHub Pages or static host)
+    // Fetch state.json from repo/server
     try {
       const stateRes = await fetch('./state.json?t=' + Date.now());
       if (stateRes.ok) {
@@ -15,7 +15,6 @@ async function updateDashboard() {
       console.log('Static state fetch fallback', e);
     }
 
-    // Fallback to local server API if running locally
     if (!state) {
       try {
         const statsRes = await fetch('/api/stats');
@@ -36,7 +35,7 @@ async function updateDashboard() {
 
     const { account, recentSignals = [] } = state;
 
-    // Fetch live market prices directly from Binance Vision API (CORS friendly)
+    // Live Binance Tickers for accurate pricing & unrealized PnL
     const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
     let prices = {};
     try {
@@ -51,12 +50,30 @@ async function updateDashboard() {
       console.warn('Ticker fetch fallback', e);
     }
 
-    // Calculate dynamic values
+    // Calculate dynamic portfolio and position values
     let holdingsValue = 0;
-    for (const [coin, data] of Object.entries(account.holdings || {})) {
+    const holdingsEntries = Object.entries(account.holdings || {});
+    const activeHoldingsData = [];
+
+    for (const [coin, data] of holdingsEntries) {
       const sym = `${coin}USDT`;
       const curPrice = prices[sym] ? parseFloat(prices[sym].lastPrice) : (data.avgPrice || 0);
-      holdingsValue += data.amount * curPrice;
+      const val = data.amount * curPrice;
+      const cost = data.amount * data.avgPrice;
+      const unrealizedPnl = val - cost;
+      const unrealizedPnlPct = cost > 0 ? ((unrealizedPnl / cost) * 100).toFixed(2) : '0.00';
+
+      holdingsValue += val;
+      activeHoldingsData.push({
+        coin,
+        amount: data.amount,
+        avgPrice: data.avgPrice,
+        curPrice,
+        val,
+        unrealizedPnl,
+        unrealizedPnlPct,
+        boughtAt: data.boughtAt || '-'
+      });
     }
 
     const totalPortfolioValue = (account.balance || 0) + holdingsValue;
@@ -64,7 +81,7 @@ async function updateDashboard() {
     const profitPercent = ((netProfit / (account.initialBalance || 10000)) * 100).toFixed(2);
     const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
 
-    // 1. Update Metric Cards
+    // 1. Metric Cards
     document.getElementById('val-portfolio').textContent = `$${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-cash').textContent = `Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
     
@@ -77,8 +94,9 @@ async function updateDashboard() {
     document.getElementById('val-winrate').textContent = `${winRate}%`;
     document.getElementById('val-trades').textContent = `${account.totalTrades || 0} closed trades`;
     document.getElementById('val-holdings-val').textContent = `$${holdingsValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    document.getElementById('val-holdings-count').textContent = `${holdingsEntries.length} active position${holdingsEntries.length === 1 ? '' : 's'}`;
 
-    // Sync Mode Selector
+    // Mode Selector
     const modeSelect = document.getElementById('chart-mode-select');
     if (document.activeElement !== modeSelect && account.chartMode) {
       modeSelect.value = account.chartMode;
@@ -94,12 +112,32 @@ async function updateDashboard() {
       botBtn.innerHTML = '<span class="dot"></span> BOT PAUSED';
     }
 
-    const holdingCount = Object.keys(account.holdings || {}).length;
-    document.getElementById('val-holdings-count').textContent = `${holdingCount} active position${holdingCount === 1 ? '' : 's'}`;
+    // 2. Render Active Open Holdings Table
+    const holdingsTbody = document.getElementById('holdings-tbody');
+    if (holdingsTbody) {
+      if (activeHoldingsData.length > 0) {
+        holdingsTbody.innerHTML = activeHoldingsData.map(h => {
+          const isPnlPositive = h.unrealizedPnl >= 0;
+          const pnlClass = isPnlPositive ? 'positive-change' : 'negative-change';
+          const pnlSign = isPnlPositive ? '+' : '';
+          return `
+            <tr>
+              <td><span class="coin-badge">${h.coin}</span></td>
+              <td>${h.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${h.coin}</td>
+              <td class="price-text">$${h.avgPrice.toFixed(4)}</td>
+              <td class="price-text">$${h.val.toFixed(2)}</td>
+              <td class="${pnlClass}"><strong>${pnlSign}$${h.unrealizedPnl.toFixed(2)} (${pnlSign}${h.unrealizedPnlPct}%)</strong></td>
+            </tr>
+          `;
+        }).join('');
+      } else {
+        holdingsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 16px;">No open positions currently held.</td></tr>`;
+      }
+    }
 
-    // Render Market Table
+    // 3. Render Market Scanner Table
     const tbody = document.getElementById('market-tbody');
-    if (Object.keys(prices).length > 0) {
+    if (tbody && Object.keys(prices).length > 0) {
       tbody.innerHTML = SYMBOLS.map(symbol => {
         const item = prices[symbol] || { lastPrice: '0', priceChangePercent: '0' };
         const price = parseFloat(item.lastPrice);
@@ -108,7 +146,6 @@ async function updateDashboard() {
         const changeClass = isUp ? 'positive-change' : 'negative-change';
         const changeSign = isUp ? '+' : '';
 
-        // Find last signal
         const sig = recentSignals.find(s => s.symbol === symbol);
         const action = sig ? sig.signal : 'HOLD';
         const candleColor = action === 'BUY' ? 'green' : (action === 'SELL' ? 'red' : 'green');
@@ -126,46 +163,54 @@ async function updateDashboard() {
       }).join('');
     }
 
-    // Render Signals Feed
-    const feed = document.getElementById('signals-feed');
-    if (recentSignals && recentSignals.length > 0) {
-      feed.innerHTML = recentSignals.map(sig => `
-        <div class="signal-card signal-${sig.signal}">
-          <div class="signal-head">
-            <strong>${sig.symbol}</strong>
-            <span class="tag tag-${sig.signal}">${sig.signal}</span>
+    // 4. Render Recent Signals Fired
+    const signalList = document.getElementById('signal-list');
+    if (signalList) {
+      if (recentSignals && recentSignals.length > 0) {
+        signalList.innerHTML = recentSignals.map(sig => `
+          <div class="feed-item">
+            <div class="feed-desc">
+              <strong>${sig.symbol}</strong>
+              <span class="feed-sub">${sig.time} · ${sig.mode || 'Line Break'}</span>
+            </div>
+            <div style="text-align: right;">
+              <span class="signal-tag signal-${sig.signal}">${sig.signal}</span>
+              <div class="feed-sub" style="margin-top: 4px;">$${Number(sig.price).toLocaleString()}</div>
+            </div>
           </div>
-          <div class="signal-body">
-            <span>Price: $${Number(sig.price).toLocaleString()}</span>
-            <small>${sig.time} (${sig.mode || 'Line Break'})</small>
-          </div>
-        </div>
-      `).join('');
-    } else {
-      feed.innerHTML = `<div class="empty-state">No recent signals yet. Monitoring markets...</div>`;
+        `).join('');
+      } else {
+        signalList.innerHTML = `<div class="empty-state">Waiting for color flip trigger...</div>`;
+      }
     }
 
-    // Render Trade Log
-    const logTbody = document.getElementById('trades-tbody');
+    // 5. Render Paper Trading Execution Log
+    const tradeList = document.getElementById('trade-list');
     const tradeHistory = account.tradeHistory || [];
-    if (tradeHistory.length > 0) {
-      logTbody.innerHTML = tradeHistory.map(tr => {
-        const isSell = tr.type === 'SELL';
-        const pnlClass = tr.pnl >= 0 ? 'positive-change' : 'negative-change';
-        const pnlText = isSell ? `${tr.pnl >= 0 ? '+' : ''}$${tr.pnl} (${tr.pnlPercent}%)` : '-';
-        return `
-          <tr>
-            <td>${tr.time}</td>
-            <td><strong>${tr.symbol}</strong></td>
-            <td><span class="signal-tag signal-${tr.type}">${tr.type}</span></td>
-            <td class="price-text">$${Number(tr.price).toLocaleString()}</td>
-            <td>${Number(tr.amount).toFixed(4)}</td>
-            <td class="${isSell ? pnlClass : ''}">${pnlText}</td>
-          </tr>
-        `;
-      }).join('');
-    } else {
-      logTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 20px;">No simulated trades executed yet. Bot will auto-trade on signals.</td></tr>`;
+    if (tradeList) {
+      if (tradeHistory.length > 0) {
+        tradeList.innerHTML = tradeHistory.map(tr => {
+          const isSell = tr.type === 'SELL';
+          const pnlClass = tr.pnl >= 0 ? 'positive-change' : 'negative-change';
+          const pnlSign = tr.pnl >= 0 ? '+' : '';
+          const pnlInfo = isSell ? `<span class="${pnlClass}" style="display:block; font-size: 0.75rem;">${pnlSign}$${tr.pnl} (${tr.pnlPercent}%)</span>` : '';
+
+          return `
+            <div class="feed-item">
+              <div class="feed-desc">
+                <strong>${tr.symbol} (${Number(tr.amount).toFixed(2)})</strong>
+                <span class="feed-sub">${tr.time} · @ $${Number(tr.price).toLocaleString()}</span>
+              </div>
+              <div style="text-align: right;">
+                <span class="signal-tag signal-${tr.type}">${tr.type}</span>
+                ${pnlInfo}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        tradeList.innerHTML = `<div class="empty-state">No executed trades yet. Bot is scanning...</div>`;
+      }
     }
 
   } catch (err) {
@@ -173,6 +218,6 @@ async function updateDashboard() {
   }
 }
 
-// Initial fetch and poll
+// Initial fetch and poll every 5 seconds
 updateDashboard();
 setInterval(updateDashboard, 5000);
