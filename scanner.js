@@ -291,18 +291,43 @@ async function runScan() {
             signal: indicator.signal
           };
 
-          if (indicator.signal === 'BUY' || indicator.signal === 'SELL') {
+          const coin = symbol.replace('USDT', '');
+          const isHolding = !!account.holdings[coin];
+
+          // Auto-Exit Rule: Sell / Close position if explicit SELL flip OR if held coin turns Red
+          const shouldExit = isHolding && (indicator.signal === 'SELL' || indicator.currColor === 'red');
+          // Entry Rule: Buy if explicit BUY signal and not currently holding
+          const shouldEnter = !isHolding && indicator.signal === 'BUY';
+
+          if (shouldExit) {
+            console.log(`[EXIT TRIGGER] Closing ${symbol} position because candle is ${indicator.currColor.toUpperCase()}`);
             state.recentSignals.unshift({
               symbol,
-              signal: indicator.signal,
+              signal: 'SELL',
               price: currentPrice,
               time: new Date().toLocaleTimeString(),
-              mode: account.chartMode
+              mode: account.chartMode,
+              reason: `Candle turned ${indicator.currColor.toUpperCase()} [Auto-Exit]`
             });
             if (state.recentSignals.length > 30) state.recentSignals.pop();
 
             if (account.autoTradingEnabled) {
-              executePaperTrade(state, symbol, indicator.signal, currentPrice);
+              executePaperTrade(state, symbol, 'SELL', currentPrice);
+            }
+          } else if (shouldEnter) {
+            console.log(`[ENTRY TRIGGER] Opening ${symbol} LONG position on GREEN color flip`);
+            state.recentSignals.unshift({
+              symbol,
+              signal: 'BUY',
+              price: currentPrice,
+              time: new Date().toLocaleTimeString(),
+              mode: account.chartMode,
+              reason: `Green Candle Entry`
+            });
+            if (state.recentSignals.length > 30) state.recentSignals.pop();
+
+            if (account.autoTradingEnabled) {
+              executePaperTrade(state, symbol, 'BUY', currentPrice);
             }
           }
         }
