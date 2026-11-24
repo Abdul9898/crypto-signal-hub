@@ -1,0 +1,26 @@
+{
+  "account": {
+    "initialBalance": 10000,
+    "balance": 10000,
+    "holdings": {},
+    "tradeHistory": [],
+    "totalTrades": 0,
+    "winningTrades": 0,
+    "autoTradingEnabled": true,
+    "riskPerTradePercent": 12,
+    "chartMode": "Line Break Style",
+    "brickMultiplier": 0.5,
+    "atrPeriod": 14,
+    "timeframe": "1m"
+  },
+  "recentSignals": [
+    {
+      "symbol": "ETHUSDT",
+      "signal": "SELL",
+      "price": 1707.88,
+      "time": "6:49:57 AM",
+      "mode": "Line Break Style"
+    }
+  ],
+  "lastUpdated": "2026-11-24T05:50:14.647Z"
+}

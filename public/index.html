@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CryptoSignal Hub · Sadeeq Trading Indicator Engine</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-pulse">⚡</div>
+        <div>
+          <h1>CRYPTO SIGNAL HUB</h1>
+          <p class="tagline">POWERED BY SADEEQ_TRADING (NO EMA · LINE BREAK / RENKO COLOR FLIP)</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <!-- Chart Mode Selector -->
+        <select id="chart-mode-select" class="mode-select">
+          <option value="Line Break Style">Line Break Style (Your Photo)</option>
+          <option value="Renko Style">Renko Style</option>
+          <option value="Heikin Ashi">Heikin Ashi</option>
+          <option value="Normal">Normal Candlestick</option>
+        </select>
+        <button id="toggle-bot-btn" class="bot-btn active">
+          <span class="dot"></span> BOT ACTIVE
+        </button>
+        <button id="reset-account-btn" class="secondary-btn">Reset</button>
+      </div>
+    </header>
+
+    <!-- Portfolio Metrics Bar -->
+    <section class="metrics-grid">
+      <div class="metric-card">
+        <span class="m-label">TOTAL PORTFOLIO VALUE</span>
+        <span class="m-value" id="val-portfolio">$10,000.00</span>
+        <span class="m-sub" id="val-cash">Cash: $10,000.00 USDT</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="m-label">NET PROFIT / LOSS</span>
+        <span class="m-value highlight" id="val-profit">+$0.00</span>
+        <span class="m-sub" id="val-profit-pct">+0.00%</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="m-label">WIN RATE</span>
+        <span class="m-value" id="val-winrate">0.0%</span>
+        <span class="m-sub" id="val-trades">0 closed trades</span>
+      </div>
+
+      <div class="metric-card">
+        <span class="m-label">ACTIVE HOLDINGS</span>
+        <span class="m-value" id="val-holdings-val">$0.00</span>
+        <span class="m-sub" id="val-holdings-count">0 positions</span>
+      </div>
+    </section>
+
+    <!-- Main Content Grid -->
+    <div class="dashboard-columns">
+      <!-- Left Column: Live Market & Signals -->
+      <main class="col-main">
+        <div class="card-header">
+          <h2>📊 Live Market Scanner (Sadeeq Color-Flip Engine)</h2>
+          <span class="live-pill"><span class="live-indicator"></span> 1m CANDLES · ULTRA FAST 3s TICK</span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="market-table">
+            <thead>
+              <tr>
+                <th>PAIR</th>
+                <th>PRICE (USDT)</th>
+                <th>24H CHANGE</th>
+                <th>CANDLE STATE</th>
+                <th>BRICK SIZE</th>
+                <th>ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="market-tbody">
+              <tr>
+                <td colspan="6" class="loading-cell">Scanning Binance markets with Sadeeq indicator...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Strategy Info Callout -->
+        <div class="strategy-banner">
+          <div class="badge">SADEEQ_TRADING RULES</div>
+          <div>
+            <strong>Pure Color-Flip Strategy:</strong>
+            Zero lagging EMA interference. Uses dynamic ATR(14) x 0.5 Line Break bricks. Fires <strong>LONG</strong> when candle turns <strong>Green</strong> and <strong>SHORT / CLOSE</strong> when candle turns <strong>Red</strong>.
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Column: Recent Signals & Paper Trade Ledger -->
+      <aside class="col-side">
+        <!-- Live Signal Feed -->
+        <div class="card-box">
+          <div class="card-header">
+            <h3>🎯 Recent Signals Fired</h3>
+          </div>
+          <div class="signal-list" id="signal-list">
+            <div class="empty-state">Waiting for color flip trigger...</div>
+          </div>
+        </div>
+
+        <!-- Paper Trades Ledger -->
+        <div class="card-box">
+          <div class="card-header">
+            <h3>📑 Paper Trading Execution Log</h3>
+          </div>
+          <div class="trade-list" id="trade-list">
+            <div class="empty-state">No executed trades yet. Bot is scanning...</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

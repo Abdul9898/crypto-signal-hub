@@ -1,0 +1,11 @@
+{
+  "name": "crypto-signal-hub",
+  "version": "1.0.0",
+  "description": "Automated Crypto Market Scanner, Trading Signals, and Paper Trading Profit Simulator",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {}
+}
