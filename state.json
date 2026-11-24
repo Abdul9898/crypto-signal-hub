@@ -1,494 +1,63 @@
 {
   "account": {
     "initialBalance": 10000,
-    "balance": 3004.825435861275,
-    "tradeHistory": [
-      {
-        "id": 1795516185900,
-        "symbol": "AVAXUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 6.702,
-        "amount": 183.41491632586929,
-        "margin": 409.75,
-        "leverage": 3,
-        "time": "11:29:45 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Red Entry"
-      },
-      {
-        "id": 1795516181750,
-        "symbol": "XRPUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 0.932,
-        "amount": 1498.7889792430453,
-        "margin": 465.62,
-        "leverage": 3,
-        "time": "11:29:41 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Color Flipped RED"
-      },
-      {
-        "id": 1795516181748,
-        "symbol": "XRPUSDT",
-        "side": "LONG",
-        "action": "CLOSE LONG",
-        "entryPrice": 0.9369,
-        "exitPrice": 0.932,
-        "amount": 989.16531509405,
-        "margin": 308.92,
-        "leverage": 3,
-        "pnl": -4.85,
-        "pnlPercent": -1.57,
-        "time": "11:29:41 AM",
-        "reason": "Flipped to RED"
-      },
-      {
-        "id": 1795516179578,
-        "symbol": "ADAUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 0.1464,
-        "amount": 9992.897853563896,
-        "margin": 487.65,
-        "leverage": 3,
-        "time": "11:29:39 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Red Entry"
-      },
-      {
-        "id": 1795516179062,
-        "symbol": "DOGEUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 0.05562,
-        "amount": 29889.51500771784,
-        "margin": 554.15,
-        "leverage": 3,
-        "time": "11:29:39 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Red Entry"
-      },
-      {
-        "id": 1795516169692,
-        "symbol": "BNBUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 546.29,
-        "amount": 3.4581508171843183,
-        "margin": 629.72,
-        "leverage": 3,
-        "time": "11:29:29 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Color Flipped RED"
-      },
-      {
-        "id": 1795516169692,
-        "symbol": "BNBUSDT",
-        "side": "LONG",
-        "action": "CLOSE LONG",
-        "entryPrice": 548.75,
-        "exitPrice": 546.29,
-        "amount": 1.9191322918028897,
-        "margin": 351.04,
-        "leverage": 3,
-        "pnl": -4.72,
-        "pnlPercent": -1.34,
-        "time": "11:29:29 AM",
-        "reason": "Flipped to RED"
-      },
-      {
-        "id": 1795516164795,
-        "symbol": "SOLUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 70.7,
-        "amount": 28.360524519050436,
-        "margin": 668.36,
-        "leverage": 3,
-        "time": "11:29:24 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Red Entry"
-      },
-      {
-        "id": 1795516162923,
-        "symbol": "ETHUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 1686.6,
-        "amount": 1.3509488451058516,
-        "margin": 759.5,
-        "leverage": 3,
-        "time": "11:29:22 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Red Entry"
-      },
-      {
-        "id": 1795516162076,
-        "symbol": "BTCUSDT",
-        "side": "SHORT",
-        "action": "OPEN SHORT (3x)",
-        "price": 59926.97,
-        "amount": 0.04320619372507466,
-        "margin": 863.07,
-        "leverage": 3,
-        "time": "11:29:22 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Color Flipped RED"
-      },
-      {
-        "id": 1795516162073,
-        "symbol": "BTCUSDT",
-        "side": "LONG",
-        "action": "CLOSE LONG",
-        "entryPrice": 60067.6,
-        "exitPrice": 59926.97,
-        "amount": 0.01992308069890567,
-        "margin": 398.91,
-        "leverage": 3,
-        "pnl": -2.8,
-        "pnlPercent": -0.7,
-        "time": "11:29:22 AM",
-        "reason": "Flipped to RED"
-      },
-      {
-        "id": 1795512827101,
-        "symbol": "XRPUSDT",
-        "type": "BUY",
-        "price": 0.9369,
-        "amount": 989.16531509405,
-        "time": "10:33:47 AM",
-        "pnl": 0,
-        "pnlPercent": 0
-      },
-      {
-        "id": 1795512825663,
-        "symbol": "BNBUSDT",
-        "type": "BUY",
-        "price": 548.75,
-        "amount": 1.9191322918028897,
-        "time": "10:33:45 AM",
-        "pnl": 0,
-        "pnlPercent": 0
-      },
-      {
-        "id": 1795512824203,
-        "symbol": "BTCUSDT",
-        "type": "BUY",
-        "price": 60067.6,
-        "amount": 0.01992308069890567,
-        "time": "10:33:44 AM",
-        "pnl": 0,
-        "pnlPercent": 0
-      },
-      {
-        "id": 1795511418654,
-        "symbol": "ADAUSDT",
-        "type": "SELL",
-        "price": 0.1464,
-        "amount": 8010.68090787717,
-        "time": "10:10:18 AM",
-        "pnl": -27.24,
-        "pnlPercent": -2.27
-      },
-      {
-        "id": 1795499505141,
-        "symbol": "ADAUSDT",
-        "type": "BUY",
-        "price": 0.1498,
-        "amount": 8010.68090787717,
-        "time": "5:51:45 AM",
-        "pnl": 0,
-        "pnlPercent": 0
-      }
-    ],
-    "totalTrades": 4,
+    "balance": 10000,
+    "holdings": {},
+    "tradeHistory": [],
+    "totalTrades": 0,
     "winningTrades": 0,
     "autoTradingEnabled": true,
     "riskPerTradePercent": 12,
     "chartMode": "Line Break Style",
     "brickMultiplier": 0.5,
     "atrPeriod": 14,
-    "timeframe": "15m",
-    "leverage": 3,
-    "positions": {
-      "BTC": {
-        "symbol": "BTCUSDT",
-        "side": "SHORT",
-        "amount": 0.04320619372507466,
-        "entryPrice": 59926.97,
-        "margin": 863.0720917255792,
-        "leverage": 3,
-        "liqPrice": 77905.061,
-        "openedAt": "11:29:22 AM",
-        "reason": "Color Flipped RED"
-      },
-      "ETH": {
-        "symbol": "ETHUSDT",
-        "side": "SHORT",
-        "amount": 1.3509488451058516,
-        "entryPrice": 1686.6,
-        "margin": 759.5034407185096,
-        "leverage": 3,
-        "liqPrice": 2192.58,
-        "openedAt": "11:29:22 AM",
-        "reason": "Red Entry"
-      },
-      "SOL": {
-        "symbol": "SOLUSDT",
-        "side": "SHORT",
-        "amount": 28.360524519050436,
-        "entryPrice": 70.7,
-        "margin": 668.3630278322886,
-        "leverage": 3,
-        "liqPrice": 91.91,
-        "openedAt": "11:29:24 AM",
-        "reason": "Red Entry"
-      },
-      "BNB": {
-        "symbol": "BNBUSDT",
-        "side": "SHORT",
-        "amount": 3.4581508171843183,
-        "entryPrice": 546.29,
-        "margin": 629.7177366398737,
-        "leverage": 3,
-        "liqPrice": 710.177,
-        "openedAt": "11:29:29 AM",
-        "reason": "Color Flipped RED"
-      },
-      "DOGE": {
-        "symbol": "DOGEUSDT",
-        "side": "SHORT",
-        "amount": 29889.51500771784,
-        "entryPrice": 0.05562,
-        "margin": 554.1516082430888,
-        "leverage": 3,
-        "liqPrice": 0.0723,
-        "openedAt": "11:29:39 AM",
-        "reason": "Red Entry"
-      },
-      "ADA": {
-        "symbol": "ADAUSDT",
-        "side": "SHORT",
-        "amount": 9992.897853563896,
-        "entryPrice": 0.1464,
-        "margin": 487.6534152539182,
-        "leverage": 3,
-        "liqPrice": 0.1903,
-        "openedAt": "11:29:39 AM",
-        "reason": "Red Entry"
-      },
-      "XRP": {
-        "symbol": "XRPUSDT",
-        "side": "SHORT",
-        "amount": 1498.7889792430453,
-        "entryPrice": 0.932,
-        "margin": 465.62377621817274,
-        "leverage": 3,
-        "liqPrice": 1.2116,
-        "openedAt": "11:29:41 AM",
-        "reason": "Color Flipped RED"
-      },
-      "AVAX": {
-        "symbol": "AVAXUSDT",
-        "side": "SHORT",
-        "amount": 183.41491632586929,
-        "entryPrice": 6.702,
-        "margin": 409.748923071992,
-        "leverage": 3,
-        "liqPrice": 8.7126,
-        "openedAt": "11:29:45 AM",
-        "reason": "Red Entry"
-      }
-    }
+    "timeframe": "15m"
   },
-  "recentSignals": [
-    {
-      "symbol": "AVAXUSDT",
-      "signal": "SELL / SHORT",
-      "price": 6.702,
-      "time": "11:29:45 AM",
-      "mode": "Line Break Style",
-      "reason": "Red Candle Entry"
-    },
-    {
-      "symbol": "XRPUSDT",
-      "signal": "SELL / SHORT",
-      "price": 0.932,
-      "time": "11:29:41 AM",
-      "mode": "Line Break Style",
-      "reason": "Color flipped RED [Futures Short Flip]"
-    },
-    {
-      "symbol": "ADAUSDT",
-      "signal": "SELL / SHORT",
-      "price": 0.1464,
-      "time": "11:29:39 AM",
-      "mode": "Line Break Style",
-      "reason": "Red Candle Entry"
-    },
-    {
-      "symbol": "DOGEUSDT",
-      "signal": "SELL / SHORT",
-      "price": 0.05562,
-      "time": "11:29:39 AM",
-      "mode": "Line Break Style",
-      "reason": "Red Candle Entry"
-    },
-    {
-      "symbol": "BNBUSDT",
-      "signal": "SELL / SHORT",
-      "price": 546.29,
-      "time": "11:29:29 AM",
-      "mode": "Line Break Style",
-      "reason": "Color flipped RED [Futures Short Flip]"
-    },
-    {
-      "symbol": "SOLUSDT",
-      "signal": "SELL / SHORT",
-      "price": 70.7,
-      "time": "11:29:24 AM",
-      "mode": "Line Break Style",
-      "reason": "Red Candle Entry"
-    },
-    {
-      "symbol": "ETHUSDT",
-      "signal": "SELL / SHORT",
-      "price": 1686.6,
-      "time": "11:29:22 AM",
-      "mode": "Line Break Style",
-      "reason": "Red Candle Entry"
-    },
-    {
-      "symbol": "BTCUSDT",
-      "signal": "SELL / SHORT",
-      "price": 59926.97,
-      "time": "11:29:21 AM",
-      "mode": "Line Break Style",
-      "reason": "Color flipped RED [Futures Short Flip]"
-    },
-    {
-      "symbol": "XRPUSDT",
-      "signal": "BUY",
-      "price": 0.9369,
-      "time": "10:33:47 AM",
-      "mode": "Line Break Style",
-      "reason": "Green Candle Entry"
-    },
-    {
-      "symbol": "BNBUSDT",
-      "signal": "BUY",
-      "price": 548.75,
-      "time": "10:33:45 AM",
-      "mode": "Line Break Style",
-      "reason": "Green Candle Entry"
-    },
-    {
-      "symbol": "BTCUSDT",
-      "signal": "BUY",
-      "price": 60067.6,
-      "time": "10:33:44 AM",
-      "mode": "Line Break Style",
-      "reason": "Green Candle Entry"
-    },
-    {
-      "symbol": "ADAUSDT",
-      "signal": "SELL",
-      "price": 0.1464,
-      "time": "10:10:18 AM",
-      "mode": "Line Break Style",
-      "reason": "Candle turned RED [Auto-Exit]"
-    },
-    {
-      "symbol": "ADAUSDT",
-      "signal": "BUY",
-      "price": 0.1484,
-      "time": "8:27:47 AM",
-      "mode": "Line Break Style"
-    },
-    {
-      "symbol": "ETHUSDT",
-      "signal": "SELL",
-      "price": 1697.03,
-      "time": "8:27:45 AM",
-      "mode": "Line Break Style"
-    },
-    {
-      "symbol": "BTCUSDT",
-      "signal": "SELL",
-      "price": 60438.01,
-      "time": "8:17:42 AM",
-      "mode": "Line Break Style"
-    },
-    {
-      "symbol": "ADAUSDT",
-      "signal": "BUY",
-      "price": 0.1498,
-      "time": "5:51:45 AM",
-      "mode": "Line Break Style"
-    },
-    {
-      "symbol": "ETHUSDT",
-      "signal": "SELL",
-      "price": 1707.88,
-      "time": "6:49:57 AM",
-      "mode": "Line Break Style"
-    }
-  ],
-  "lastUpdated": "2026-11-24T10:29:45.901Z",
+  "recentSignals": [],
   "marketScan": {
     "BTCUSDT": {
       "symbol": "BTCUSDT",
-      "price": 59926.97,
+      "price": 59823.16,
       "candleColor": "red",
-      "brickSize": "133.3698",
-      "atr": "266.7396",
+      "brickSize": "136.2263",
+      "atr": "272.4526",
       "signal": "HOLD"
     },
     "ETHUSDT": {
       "symbol": "ETHUSDT",
-      "price": 1686.6,
+      "price": 1687.34,
       "candleColor": "red",
-      "brickSize": "4.2319",
-      "atr": "8.4638",
+      "brickSize": "4.2632",
+      "atr": "8.5263",
       "signal": "HOLD"
     },
     "SOLUSDT": {
       "symbol": "SOLUSDT",
-      "price": 70.7,
+      "price": 70.28,
       "candleColor": "red",
-      "brickSize": "0.1834",
-      "atr": "0.3667",
-      "signal": "SELL"
+      "brickSize": "0.1884",
+      "atr": "0.3768",
+      "signal": "HOLD"
     },
     "BNBUSDT": {
       "symbol": "BNBUSDT",
-      "price": 546.29,
+      "price": 546.99,
       "candleColor": "red",
-      "brickSize": "1.1229",
-      "atr": "2.2458",
+      "brickSize": "1.0980",
+      "atr": "2.1959",
       "signal": "HOLD"
     },
     "DOGEUSDT": {
       "symbol": "DOGEUSDT",
-      "price": 0.05562,
+      "price": 0.05556,
       "candleColor": "red",
-      "brickSize": "0.0001",
+      "brickSize": "0.0002",
       "atr": "0.0003",
       "signal": "HOLD"
     },
     "ADAUSDT": {
       "symbol": "ADAUSDT",
-      "price": 0.1464,
+      "price": 0.1461,
       "candleColor": "red",
       "brickSize": "0.0004",
       "atr": "0.0008",
@@ -496,19 +65,20 @@
     },
     "XRPUSDT": {
       "symbol": "XRPUSDT",
-      "price": 0.932,
+      "price": 0.9284,
       "candleColor": "red",
-      "brickSize": "0.0025",
+      "brickSize": "0.0024",
       "atr": "0.0049",
-      "signal": "SELL"
+      "signal": "HOLD"
     },
     "AVAXUSDT": {
       "symbol": "AVAXUSDT",
-      "price": 6.702,
+      "price": 6.708,
       "candleColor": "red",
-      "brickSize": "0.0177",
-      "atr": "0.0354",
+      "brickSize": "0.0176",
+      "atr": "0.0352",
       "signal": "HOLD"
     }
-  }
+  },
+  "lastUpdated": "2026-11-24T11:27:52.143Z"
 }

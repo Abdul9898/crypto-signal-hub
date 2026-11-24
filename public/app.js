@@ -1,4 +1,4 @@
-// Client-Side Real-Time TradingView Engine & Futures Dashboard Controller
+// Client-Side Real-Time TradingView Engine & Dashboard Controller
 const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
 
 // Pure Pine Script math: "All Charts · Sadeeq_Trading"
@@ -57,8 +57,8 @@ function calculatePineIndicator(klines, brickMultiplier = 0.5, atrLen = 14) {
   return {
     price: closes[last],
     candleColor: currColor,
-    signal: longSig ? 'BUY' : (shortSig ? 'SELL' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
-    actionBadge: longSig ? 'BUY' : (shortSig ? 'SELL' : (currColor === 'green' ? 'LONG BIAS' : 'SHORT BIAS')),
+    signal: longSig ? 'LONG' : (shortSig ? 'SHORT' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
+    actionBadge: longSig ? 'LONG' : (shortSig ? 'SHORT' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
     brickSize: (atrArr[last] * brickMultiplier).toFixed(4),
     atr: atrArr[last].toFixed(4),
     time: new Date(klines[last][0]).toLocaleTimeString()
@@ -83,7 +83,7 @@ async function updateDashboard() {
     if (!state || !state.account) return;
 
     const { account, recentSignals = [] } = state;
-    const positions = account.positions || {};
+    const holdings = account.holdings || {};
 
     // 24h Binance Tickers
     let tickers = {};
@@ -122,50 +122,40 @@ async function updateDashboard() {
       }
     }
 
-    // Calculate Futures Unrealized PnL & Margin Valuation
-    let totalUnrealizedPnl = 0;
-    let totalMarginLocked = 0;
-    const activePositionsData = [];
+    // Dynamic Portfolio & Holdings Valuation
+    let holdingsValue = 0;
+    const holdingsEntries = Object.entries(holdings);
+    const activeHoldingsData = [];
 
-    for (const [coin, pos] of Object.entries(positions)) {
+    for (const [coin, data] of holdingsEntries) {
       const sym = `${coin}USDT`;
       const liveCoinData = marketScanResults.find(m => m.symbol === sym);
-      const curPrice = liveCoinData ? liveCoinData.price : (pos.entryPrice || 0);
-      
-      let pnl = 0;
-      if (pos.side === 'LONG') {
-        pnl = (curPrice - pos.entryPrice) * pos.amount;
-      } else {
-        pnl = (pos.entryPrice - curPrice) * pos.amount;
-      }
+      const curPrice = liveCoinData ? liveCoinData.price : (data.avgPrice || 0);
+      const val = data.amount * curPrice;
+      const cost = data.amount * data.avgPrice;
+      const unrealizedPnl = val - cost;
+      const unrealizedPnlPct = cost > 0 ? ((unrealizedPnl / cost) * 100).toFixed(2) : '0.00';
 
-      const pnlPct = pos.margin > 0 ? ((pnl / pos.margin) * 100).toFixed(2) : '0.00';
-      totalUnrealizedPnl += pnl;
-      totalMarginLocked += (pos.margin || 0);
-
-      activePositionsData.push({
+      holdingsValue += val;
+      activeHoldingsData.push({
         coin,
-        side: pos.side,
-        amount: pos.amount,
-        entryPrice: pos.entryPrice,
+        amount: data.amount,
+        avgPrice: data.avgPrice,
         curPrice,
-        liqPrice: pos.liqPrice,
-        margin: pos.margin,
-        leverage: pos.leverage || 3,
-        pnl,
-        pnlPct
+        val,
+        unrealizedPnl,
+        unrealizedPnlPct
       });
     }
 
-    // Total Portfolio Value = Available Margin Cash + Margin in Contracts + Unrealized PnL
-    const totalPortfolioValue = (account.balance || 0) + totalMarginLocked + totalUnrealizedPnl;
+    const totalPortfolioValue = (account.balance || 0) + holdingsValue;
     const netProfit = totalPortfolioValue - (account.initialBalance || 10000);
     const profitPercent = ((netProfit / (account.initialBalance || 10000)) * 100).toFixed(2);
     const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
 
-    // 1. Metric Cards
+    // 1. Update Portfolio Metric Cards
     document.getElementById('val-portfolio').textContent = `$${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    document.getElementById('val-cash').textContent = `Margin Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
+    document.getElementById('val-cash').textContent = `Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
     
     const profitEl = document.getElementById('val-profit');
     const profitSign = netProfit >= 0 ? '+' : '';
@@ -174,36 +164,30 @@ async function updateDashboard() {
     
     document.getElementById('val-profit-pct').textContent = `${profitSign}${profitPercent}%`;
     document.getElementById('val-winrate').textContent = `${winRate}%`;
-    document.getElementById('val-trades').textContent = `${account.totalTrades || 0} closed contracts`;
-    document.getElementById('val-holdings-val').textContent = `$${(totalMarginLocked + totalUnrealizedPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    document.getElementById('val-holdings-count').textContent = `${activePositionsData.length} active contract${activePositionsData.length === 1 ? '' : 's'}`;
+    document.getElementById('val-trades').textContent = `${account.totalTrades || 0} closed trades`;
+    document.getElementById('val-holdings-val').textContent = `$${holdingsValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    document.getElementById('val-holdings-count').textContent = `${holdingsEntries.length} active position${holdingsEntries.length === 1 ? '' : 's'}`;
 
-    // 2. Render Active Futures Positions Table
+    // 2. Render Active Holdings Table
     const holdingsTbody = document.getElementById('holdings-tbody');
     if (holdingsTbody) {
-      if (activePositionsData.length > 0) {
-        holdingsTbody.innerHTML = activePositionsData.map(p => {
-          const isPnlPositive = p.pnl >= 0;
+      if (activeHoldingsData.length > 0) {
+        holdingsTbody.innerHTML = activeHoldingsData.map(h => {
+          const isPnlPositive = h.unrealizedPnl >= 0;
           const pnlClass = isPnlPositive ? 'positive-change' : 'negative-change';
           const pnlSign = isPnlPositive ? '+' : '';
-          const sideColor = p.side === 'LONG' ? 'state-green' : 'state-red';
-
           return `
             <tr>
-              <td>
-                <span class="coin-badge">${p.coin}</span>
-                <span class="state-tag ${sideColor}" style="margin-left: 6px; font-weight:800;">${p.side} ${p.leverage}x</span>
-              </td>
-              <td>${p.amount.toFixed(4)} ${p.coin}</td>
-              <td class="price-text">$${p.entryPrice >= 1 ? p.entryPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : p.entryPrice.toFixed(4)}</td>
-              <td class="price-text" style="color: #f87171;">$${p.liqPrice >= 1 ? p.liqPrice.toLocaleString(undefined, { minimumFractionDigits: 2 }) : p.liqPrice.toFixed(4)}</td>
-              <td class="price-text">$${p.margin.toFixed(2)}</td>
-              <td class="${pnlClass}"><strong>${pnlSign}$${p.pnl.toFixed(2)} (${pnlSign}${pnlPct}%)</strong></td>
+              <td><span class="coin-badge">${h.coin}</span></td>
+              <td>${h.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${h.coin}</td>
+              <td class="price-text">$${h.avgPrice.toFixed(4)}</td>
+              <td class="price-text">$${h.val.toFixed(2)}</td>
+              <td class="${pnlClass}"><strong>${pnlSign}$${h.unrealizedPnl.toFixed(2)} (${pnlSign}${h.unrealizedPnlPct}%)</strong></td>
             </tr>
           `;
         }).join('');
       } else {
-        holdingsTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 16px;">No open futures contracts held. Bot is waiting for signals.</td></tr>`;
+        holdingsTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color: var(--text-muted); padding: 16px;">No open positions currently held.</td></tr>`;
       }
     }
 
@@ -215,15 +199,17 @@ async function updateDashboard() {
         const changeClass = isUp ? 'positive-change' : 'negative-change';
         const changeSign = isUp ? '+' : '';
         const price = item.price;
+        const stateColor = item.candleColor === 'green' ? 'state-green' : 'state-red';
+        const actionClass = item.actionBadge === 'LONG' || item.actionBadge === 'BULLISH' ? 'signal-BUY' : 'signal-SELL';
 
         return `
           <tr>
             <td><span class="coin-badge">${item.symbol}</span></td>
             <td class="price-text">$${price >= 1 ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : price.toFixed(5)}</td>
             <td class="${changeClass}">${changeSign}${item.priceChangePercent.toFixed(2)}%</td>
-            <td><span class="state-tag state-${item.candleColor}">${item.candleColor}</span></td>
+            <td><span class="state-tag ${stateColor}">${item.candleColor}</span></td>
             <td class="price-text">$${Number(item.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
-            <td><span class="signal-tag signal-${item.actionBadge.replace(' ', '_')}">${item.actionBadge}</span></td>
+            <td><span class="signal-tag ${actionClass}">${item.actionBadge}</span></td>
           </tr>
         `;
       }).join('');
@@ -233,49 +219,57 @@ async function updateDashboard() {
     const signalList = document.getElementById('signal-list');
     if (signalList) {
       if (recentSignals && recentSignals.length > 0) {
-        signalList.innerHTML = recentSignals.map(sig => `
-          <div class="feed-item">
-            <div class="feed-desc">
-              <strong>${sig.symbol}</strong>
-              <span class="feed-sub">${sig.time} · 15m Futures</span>
-            </div>
-            <div style="text-align: right;">
-              <span class="signal-tag signal-${sig.signal.replace(/[^A-Za-z]/g, '_')}">${sig.signal}</span>
-              <div class="feed-sub" style="margin-top: 4px;">$${Number(sig.price).toLocaleString()}</div>
-            </div>
-          </div>
-        `).join('');
-      } else {
-        signalList.innerHTML = `<div class="empty-state">Waiting for color flip trigger...</div>`;
-      }
-    }
-
-    // 5. Render Futures Execution Log
-    const tradeList = document.getElementById('trade-list');
-    const tradeHistory = account.tradeHistory || [];
-    if (tradeList) {
-      if (tradeHistory.length > 0) {
-        tradeList.innerHTML = tradeHistory.map(tr => {
-          const isClose = (tr.action || '').startsWith('CLOSE');
-          const pnlClass = tr.pnl >= 0 ? 'positive-change' : 'negative-change';
-          const pnlSign = tr.pnl >= 0 ? '+' : '';
-          const pnlInfo = isClose ? `<span class="${pnlClass}" style="display:block; font-size: 0.75rem;">${pnlSign}$${tr.pnl} (${tr.pnlPercent}%)</span>` : '';
-
+        signalList.innerHTML = recentSignals.map(sig => {
+          const actionText = sig.action || sig.signal || 'SIGNAL';
+          const isBuy = actionText.includes('LONG') || actionText.includes('BUY');
+          const badgeClass = isBuy ? 'signal-BUY' : 'signal-SELL';
           return `
             <div class="feed-item">
               <div class="feed-desc">
-                <strong>${tr.symbol} (${Number(tr.amount).toFixed(2)})</strong>
-                <span class="feed-sub">${tr.time} · ${tr.action || tr.type}</span>
+                <strong>${sig.symbol} · ${actionText}</strong>
+                <span class="feed-sub">${sig.reason || (sig.time + ' · Line Break Style')}</span>
               </div>
               <div style="text-align: right;">
-                <span class="signal-tag signal-${(tr.side || 'BUY')}">${tr.side || tr.type}</span>
-                ${pnlInfo}
+                <span class="signal-tag ${badgeClass}">${actionText}</span>
+                <div class="feed-sub" style="margin-top: 4px;">$${Number(sig.price).toLocaleString()}</div>
               </div>
             </div>
           `;
         }).join('');
       } else {
-        tradeList.innerHTML = `<div class="empty-state">No executed contracts yet. Bot is scanning...</div>`;
+        signalList.innerHTML = `<div class="empty-state">Waiting for color flip trigger...</div>`;
+      }
+    }
+
+    // 5. Render Paper Trading Execution Log (Clean Display - No Undefined)
+    const tradeList = document.getElementById('trade-list');
+    const tradeHistory = account.tradeHistory || [];
+    if (tradeList) {
+      if (tradeHistory.length > 0) {
+        tradeList.innerHTML = tradeHistory.map(tr => {
+          const isClose = (tr.action || tr.type || '').includes('CLOSE') || (tr.action || tr.type || '').includes('SHORT') || (tr.type === 'SELL');
+          const pnlVal = tr.pnl || 0;
+          const pnlClass = pnlVal >= 0 ? 'positive-change' : 'negative-change';
+          const pnlSign = pnlVal >= 0 ? '+' : '';
+          const pnlText = isClose && tr.pnl !== undefined ? `<span class="${pnlClass}" style="display:block; font-size: 0.75rem;">${pnlSign}$${pnlVal.toFixed(2)}</span>` : '';
+          const actionName = tr.action || tr.type || 'TRADE';
+          const badgeClass = actionName.includes('LONG') || actionName.includes('BUY') ? 'signal-BUY' : 'signal-SELL';
+
+          return `
+            <div class="feed-item">
+              <div class="feed-desc">
+                <strong>${actionName} ${tr.symbol}</strong>
+                <span class="feed-sub">${tr.amount || ''} @ $${Number(tr.price || tr.exitPrice || 0).toLocaleString()} · ${tr.time}</span>
+              </div>
+              <div style="text-align: right;">
+                <span class="signal-tag ${badgeClass}">${actionName}</span>
+                ${pnlText}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        tradeList.innerHTML = `<div class="empty-state">No executed trades yet. Bot is scanning...</div>`;
       }
     }
 
