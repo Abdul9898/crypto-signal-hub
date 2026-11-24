@@ -1,7 +1,7 @@
 {
   "account": {
     "initialBalance": 10000,
-    "balance": 4991.288442262346,
+    "balance": 4989.557359565607,
     "holdings": {
       "BTC": {
         "amount": 0.019893084616727397,
@@ -28,13 +28,39 @@
         "avgPrice": 6.571,
         "boughtAt": "12:55:09 AM"
       },
-      "PEPE": {
-        "amount": 196713942.8111802,
-        "avgPrice": 0.00000346,
-        "boughtAt": "12:55:09 AM"
+      "SUI": {
+        "amount": 1049.1814732387202,
+        "avgPrice": 0.6485,
+        "boughtAt": "11:56:06 PM"
       }
     },
     "tradeHistory": [
+      {
+        "id": 1795564566222,
+        "symbol": "SUIUSDT",
+        "type": "LONG",
+        "action": "LONG",
+        "price": 0.6485,
+        "amount": 1049.1815,
+        "totalUSDT": 680.39,
+        "time": "11:56:06 PM",
+        "pnl": 0,
+        "pnlPercent": 0,
+        "reason": "Green Entry [Line Break Style]"
+      },
+      {
+        "id": 1795564565738,
+        "symbol": "PEPEUSDT",
+        "type": "CLOSE / SHORT",
+        "action": "CLOSE / SHORT",
+        "price": 0.00000345,
+        "amount": 196713942.8112,
+        "totalUSDT": 678.66,
+        "time": "11:56:05 PM",
+        "pnl": -1.97,
+        "pnlPercent": -0.29,
+        "reason": "Red Exit [Line Break Style]"
+      },
       {
         "id": 1795564509568,
         "symbol": "PEPEUSDT",
@@ -218,7 +244,7 @@
         "reason": "Green Candle Entry"
       }
     ],
-    "totalTrades": 14,
+    "totalTrades": 16,
     "winningTrades": 0,
     "autoTradingEnabled": true,
     "riskPerTradePercent": 12,
@@ -230,6 +256,24 @@
     "superTrendAtrLen": 10
   },
   "recentSignals": [
+    {
+      "symbol": "SUIUSDT",
+      "signal": "LONG",
+      "action": "LONG",
+      "price": 0.6485,
+      "time": "11:56:06 PM",
+      "mode": "3m · Line Break Style",
+      "reason": "Green Impulse Entry [Line Break Style]"
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "signal": "SHORT",
+      "action": "SHORT",
+      "price": 0.00000345,
+      "time": "11:56:05 PM",
+      "mode": "3m · Line Break Style",
+      "reason": "Red Impulse Exit [Line Break Style]"
+    },
     {
       "symbol": "PEPEUSDT",
       "signal": "LONG",
@@ -360,21 +404,21 @@
   "marketScan": {
     "BTCUSDT": {
       "symbol": "BTCUSDT",
-      "price": 59823,
+      "price": 59849.01,
       "candleColor": "green",
-      "brickSize": "28.5232451",
+      "brickSize": "29.34645938",
       "stopLevel": null,
-      "atr": "57.04649019",
+      "atr": "58.69291876",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
     "ETHUSDT": {
       "symbol": "ETHUSDT",
-      "price": 1679.89,
+      "price": 1680.11,
       "candleColor": "green",
-      "brickSize": "0.91869689",
+      "brickSize": "0.9279826",
       "stopLevel": null,
-      "atr": "1.83739378",
+      "atr": "1.85596521",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
@@ -390,51 +434,51 @@
     },
     "BNBUSDT": {
       "symbol": "BNBUSDT",
-      "price": 548.38,
-      "candleColor": "red",
-      "brickSize": "0.26364569",
+      "price": 548.63,
+      "candleColor": "green",
+      "brickSize": "0.27150283",
       "stopLevel": null,
-      "atr": "0.52729138",
-      "signal": "HOLD",
+      "atr": "0.54300566",
+      "signal": "BUY",
       "mode": "Line Break Style"
     },
     "DOGEUSDT": {
       "symbol": "DOGEUSDT",
-      "price": 0.05529,
+      "price": 0.05531,
       "candleColor": "green",
-      "brickSize": "0.00003435",
+      "brickSize": "0.00003542",
       "stopLevel": null,
-      "atr": "0.0000687",
+      "atr": "0.00007084",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
     "ADAUSDT": {
       "symbol": "ADAUSDT",
-      "price": 0.1444,
-      "candleColor": "red",
-      "brickSize": "0.0001039",
+      "price": 0.1446,
+      "candleColor": "green",
+      "brickSize": "0.00010747",
       "stopLevel": null,
-      "atr": "0.0002078",
-      "signal": "HOLD",
+      "atr": "0.00021494",
+      "signal": "BUY",
       "mode": "Line Break Style"
     },
     "XRPUSDT": {
       "symbol": "XRPUSDT",
-      "price": 0.9255,
+      "price": 0.9259,
       "candleColor": "green",
-      "brickSize": "0.00060657",
+      "brickSize": "0.00062442",
       "stopLevel": null,
-      "atr": "0.00121313",
+      "atr": "0.00124885",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
     "AVAXUSDT": {
       "symbol": "AVAXUSDT",
-      "price": 6.571,
+      "price": 6.576,
       "candleColor": "green",
-      "brickSize": "0.00417657",
+      "brickSize": "0.00435514",
       "stopLevel": null,
-      "atr": "0.00835314",
+      "atr": "0.00871028",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
@@ -450,34 +494,34 @@
     },
     "SHIBUSDT": {
       "symbol": "SHIBUSDT",
-      "price": 0.00000354,
-      "candleColor": "red",
+      "price": 0.00000355,
+      "candleColor": "green",
       "brickSize": "0",
       "stopLevel": null,
       "atr": "1e-8",
-      "signal": "HOLD",
+      "signal": "BUY",
       "mode": "Line Break Style"
     },
     "NEARUSDT": {
       "symbol": "NEARUSDT",
-      "price": 2.885,
+      "price": 2.887,
       "candleColor": "red",
-      "brickSize": "0.00334377",
+      "brickSize": "0.00341519",
       "stopLevel": null,
-      "atr": "0.00668753",
+      "atr": "0.00683039",
       "signal": "HOLD",
       "mode": "Line Break Style"
     },
     "SUIUSDT": {
       "symbol": "SUIUSDT",
-      "price": 0.6482,
+      "price": 0.6484,
       "candleColor": "green",
-      "brickSize": "0.00047867",
+      "brickSize": "0.00049652",
       "stopLevel": null,
-      "atr": "0.00095733",
+      "atr": "0.00099304",
       "signal": "HOLD",
       "mode": "Line Break Style"
     }
   },
-  "lastUpdated": "2026-11-24T23:55:10.777Z"
+  "lastUpdated": "2026-11-24T23:56:20.650Z"
 }
