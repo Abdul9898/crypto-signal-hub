@@ -32,6 +32,13 @@
   },
   "recentSignals": [
     {
+      "symbol": "BTCUSDT",
+      "signal": "SELL",
+      "price": 60438.01,
+      "time": "8:17:42 AM",
+      "mode": "Line Break Style"
+    },
+    {
       "symbol": "ADAUSDT",
       "signal": "BUY",
       "price": 0.1498,
@@ -46,5 +53,71 @@
       "mode": "Line Break Style"
     }
   ],
-  "lastUpdated": "2026-11-24T05:51:45.437Z"
+  "lastUpdated": "2026-11-24T07:17:45.298Z",
+  "marketScan": {
+    "BTCUSDT": {
+      "symbol": "BTCUSDT",
+      "price": 60438.01,
+      "candleColor": "red",
+      "brickSize": "23.7875",
+      "atr": "47.5750",
+      "signal": "SELL"
+    },
+    "ETHUSDT": {
+      "symbol": "ETHUSDT",
+      "price": 1698.51,
+      "candleColor": "red",
+      "brickSize": "0.6592",
+      "atr": "1.3184",
+      "signal": "HOLD"
+    },
+    "SOLUSDT": {
+      "symbol": "SOLUSDT",
+      "price": 71.72,
+      "candleColor": "red",
+      "brickSize": "0.0364",
+      "atr": "0.0727",
+      "signal": "HOLD"
+    },
+    "BNBUSDT": {
+      "symbol": "BNBUSDT",
+      "price": 552.21,
+      "candleColor": "red",
+      "brickSize": "0.1876",
+      "atr": "0.3751",
+      "signal": "HOLD"
+    },
+    "DOGEUSDT": {
+      "symbol": "DOGEUSDT",
+      "price": 0.05638,
+      "candleColor": "red",
+      "brickSize": "0.0000",
+      "atr": "0.0000",
+      "signal": "HOLD"
+    },
+    "ADAUSDT": {
+      "symbol": "ADAUSDT",
+      "price": 0.1483,
+      "candleColor": "red",
+      "brickSize": "0.0001",
+      "atr": "0.0002",
+      "signal": "HOLD"
+    },
+    "XRPUSDT": {
+      "symbol": "XRPUSDT",
+      "price": 0.9453,
+      "candleColor": "red",
+      "brickSize": "0.0005",
+      "atr": "0.0010",
+      "signal": "HOLD"
+    },
+    "AVAXUSDT": {
+      "symbol": "AVAXUSDT",
+      "price": 6.747,
+      "candleColor": "red",
+      "brickSize": "0.0029",
+      "atr": "0.0058",
+      "signal": "HOLD"
+    }
+  }
 }

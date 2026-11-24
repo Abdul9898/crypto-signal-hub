@@ -27,6 +27,7 @@ let defaultState = {
     atrPeriod: 14,
     timeframe: "1m"
   },
+  marketScan: {},
   recentSignals: [],
   lastUpdated: null
 };
@@ -253,6 +254,16 @@ async function runScan() {
 
         if (indicator) {
           console.log(`[${symbol}] Price: $${currentPrice} | Mode: ${account.chartMode} | Color: ${indicator.currColor} | Signal: ${indicator.signal}`);
+
+          if (!state.marketScan) state.marketScan = {};
+          state.marketScan[symbol] = {
+            symbol,
+            price: currentPrice,
+            candleColor: indicator.currColor,
+            brickSize: indicator.brick,
+            atr: indicator.atr,
+            signal: indicator.signal
+          };
 
           if (indicator.signal === 'BUY' || indicator.signal === 'SELL') {
             state.recentSignals.unshift({

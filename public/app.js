@@ -5,7 +5,7 @@ async function updateDashboard() {
   try {
     let state = null;
 
-    // Fetch state.json from repo/server
+    // Fetch persistent state.json
     try {
       const stateRes = await fetch('./state.json?t=' + Date.now());
       if (stateRes.ok) {
@@ -24,7 +24,8 @@ async function updateDashboard() {
         state = {
           account: stats,
           recentSignals: mData.recentSignals || [],
-          marketData: mData.marketData || []
+          marketData: mData.marketData || [],
+          marketScan: {}
         };
       } catch (e) {
         console.error('API fetch failed', e);
@@ -33,7 +34,7 @@ async function updateDashboard() {
 
     if (!state || !state.account) return;
 
-    const { account, recentSignals = [] } = state;
+    const { account, recentSignals = [], marketScan = {} } = state;
 
     // Live Binance Tickers for accurate pricing & unrealized PnL
     const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
@@ -135,7 +136,7 @@ async function updateDashboard() {
       }
     }
 
-    // 3. Render Market Scanner Table
+    // 3. Render Market Scanner Table (Proper 6 Columns Aligned)
     const tbody = document.getElementById('market-tbody');
     if (tbody && Object.keys(prices).length > 0) {
       tbody.innerHTML = SYMBOLS.map(symbol => {
@@ -146,9 +147,11 @@ async function updateDashboard() {
         const changeClass = isUp ? 'positive-change' : 'negative-change';
         const changeSign = isUp ? '+' : '';
 
-        const sig = recentSignals.find(s => s.symbol === symbol);
-        const action = sig ? sig.signal : 'HOLD';
-        const candleColor = action === 'BUY' ? 'green' : (action === 'SELL' ? 'red' : 'green');
+        // Exact indicator calculation from cloud scanner
+        const scan = marketScan[symbol];
+        const candleColor = scan ? scan.candleColor : (isUp ? 'green' : 'red');
+        const brickSizeDisplay = scan && scan.brickSize ? `$${Number(scan.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : '-';
+        const action = scan ? scan.signal : 'HOLD';
 
         return `
           <tr>
@@ -156,8 +159,8 @@ async function updateDashboard() {
             <td class="price-text">$${price >= 1 ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : price.toFixed(5)}</td>
             <td class="${changeClass}">${changeSign}${changePct.toFixed(2)}%</td>
             <td><span class="state-tag state-${candleColor}">${candleColor}</span></td>
+            <td class="price-text">${brickSizeDisplay}</td>
             <td><span class="signal-tag signal-${action}">${action}</span></td>
-            <td><span class="status-indicator">SCANNING</span></td>
           </tr>
         `;
       }).join('');
