@@ -324,19 +324,19 @@ body {
   font-weight: 700;
 }
 
-.signal-STRONG_BUY, .signal-BUY {
+.signal-STRONG_BUY, .signal-BUY, .signal-LONG_BIAS, .signal-BULLISH {
   background: var(--green-glow);
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.4);
 }
 
-.signal-STRONG_SELL, .signal-SELL {
+.signal-STRONG_SELL, .signal-SELL, .signal-SHORT_BIAS, .signal-BEARISH {
   background: var(--red-glow);
   color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.4);
 }
 
-.signal-NEUTRAL {
+.signal-NEUTRAL, .signal-HOLD {
   background: rgba(148, 163, 184, 0.1);
   color: #94a3b8;
 }

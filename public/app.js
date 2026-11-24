@@ -1,64 +1,141 @@
-// Client-Side Controller for Crypto Signal Hub with Sadeeq Indicator
+// Client-Side Real-Time TradingView Engine & Dashboard Controller
+const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
+
+// Pure Pine Script math: "All Charts · Sadeeq_Trading"
+function calculatePineIndicator(klines, brickMultiplier = 0.5, atrLen = 14) {
+  if (!Array.isArray(klines) || klines.length < atrLen + 2) return null;
+
+  const opens = klines.map(d => parseFloat(d[1]));
+  const highs = klines.map(d => parseFloat(d[2]));
+  const lows = klines.map(d => parseFloat(d[3]));
+  const closes = klines.map(d => parseFloat(d[4]));
+  const len = closes.length;
+
+  // Exact TradingView RMA Wilder ATR
+  const tr = [highs[0] - lows[0]];
+  for (let i = 1; i < len; i++) {
+    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+  }
+  let atrArr = new Array(len).fill(0);
+  let sum = 0;
+  for (let i = 0; i < atrLen; i++) sum += tr[i];
+  atrArr[atrLen - 1] = sum / atrLen;
+  for (let i = atrLen; i < len; i++) {
+    atrArr[i] = (atrArr[i - 1] * (atrLen - 1) + tr[i]) / atrLen;
+  }
+
+  // Exact Line Break Style from Pine Script:
+  // lbClose := na(lbClose[1]) ? close : math.abs(close - lbClose[1]) >= brick ? close : lbClose[1]
+  // lbOpen  := na(lbOpen[1])  ? close : lbClose != lbClose[1] ? lbClose[1] : lbOpen[1]
+  let lbClose = closes[0];
+  let lbOpen = closes[0];
+  let cClose = [];
+  let cOpen = [];
+
+  for (let i = 0; i < len; i++) {
+    const c = closes[i];
+    const brick = atrArr[i] * brickMultiplier;
+    const prevLbClose = lbClose;
+    if (Math.abs(c - prevLbClose) >= brick) {
+      lbClose = c;
+    }
+    if (lbClose !== prevLbClose) {
+      lbOpen = prevLbClose;
+    }
+    cClose.push(lbClose);
+    cOpen.push(lbOpen);
+  }
+
+  const isUp = [];
+  for (let i = 0; i < len; i++) {
+    isUp.push(cClose[i] >= cOpen[i]);
+  }
+
+  const last = len - 1;
+  const prev = len - 2;
+  const longSig = isUp[last] && !isUp[prev];
+  const shortSig = !isUp[last] && isUp[prev];
+  const currColor = isUp[last] ? 'green' : 'red';
+
+  return {
+    price: closes[last],
+    candleColor: currColor,
+    signal: longSig ? 'BUY' : (shortSig ? 'SELL' : (currColor === 'green' ? 'BULLISH' : 'BEARISH')),
+    actionBadge: longSig ? 'BUY' : (shortSig ? 'SELL' : (currColor === 'green' ? 'LONG BIAS' : 'SHORT BIAS')),
+    actionType: longSig ? 'BUY' : (shortSig ? 'SELL' : 'HOLD'),
+    brickSize: (atrArr[last] * brickMultiplier).toFixed(4),
+    atr: atrArr[last].toFixed(4),
+    time: new Date(klines[last][0]).toLocaleTimeString()
+  };
+}
+
 let autoTradingEnabled = true;
 
 async function updateDashboard() {
   try {
     let state = null;
 
-    // Fetch persistent state.json
+    // Load persistent paper trading state
     try {
       const stateRes = await fetch('./state.json?t=' + Date.now());
       if (stateRes.ok) {
         state = await stateRes.json();
       }
     } catch (e) {
-      console.log('Static state fetch fallback', e);
-    }
-
-    if (!state) {
-      try {
-        const statsRes = await fetch('/api/stats');
-        const stats = await statsRes.json();
-        const marketRes = await fetch('/api/market');
-        const mData = await marketRes.json();
-        state = {
-          account: stats,
-          recentSignals: mData.recentSignals || [],
-          marketData: mData.marketData || [],
-          marketScan: {}
-        };
-      } catch (e) {
-        console.error('API fetch failed', e);
-      }
+      console.log('State fetch error:', e);
     }
 
     if (!state || !state.account) return;
 
-    const { account, recentSignals = [], marketScan = {} } = state;
+    const { account, recentSignals = [] } = state;
 
-    // Live Binance Tickers for accurate pricing & unrealized PnL
-    const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'DOGEUSDT', 'ADAUSDT', 'XRPUSDT', 'AVAXUSDT'];
-    let prices = {};
+    // Fetch 24h ticker for daily volume & change
+    let tickers = {};
     try {
       const tickerRes = await fetch('https://data-api.binance.vision/api/v3/ticker/24hr');
-      const tickers = await tickerRes.json();
-      tickers.forEach(t => {
-        if (SYMBOLS.includes(t.symbol)) {
-          prices[t.symbol] = t;
-        }
+      const allTickers = await tickerRes.json();
+      allTickers.forEach(t => {
+        if (SYMBOLS.includes(t.symbol)) tickers[t.symbol] = t;
       });
     } catch (e) {
-      console.warn('Ticker fetch fallback', e);
+      console.warn('Ticker fetch error:', e);
     }
 
-    // Calculate dynamic portfolio and position values
+    // Run Real-Time 1m Pine Script Indicator Directly in Browser for every coin
+    const marketScanResults = [];
+    for (const sym of SYMBOLS) {
+      try {
+        const klineRes = await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=1m&limit=150`);
+        const klines = await klineRes.json();
+        const ind = calculatePineIndicator(klines, account.brickMultiplier || 0.5, account.atrPeriod || 14);
+        if (ind) {
+          const tick = tickers[sym] || { priceChangePercent: '0' };
+          marketScanResults.push({
+            symbol: sym,
+            price: ind.price,
+            priceChangePercent: parseFloat(tick.priceChangePercent),
+            candleColor: ind.candleColor,
+            brickSize: ind.brickSize,
+            actionBadge: ind.actionBadge,
+            actionType: ind.actionType,
+            signal: ind.signal,
+            time: ind.time
+          });
+        }
+      } catch (err) {
+        console.warn(`Error scanning ${sym}:`, err);
+      }
+    }
+
+    // Dynamic Portfolio & Holdings Valuation
     let holdingsValue = 0;
     const holdingsEntries = Object.entries(account.holdings || {});
     const activeHoldingsData = [];
 
     for (const [coin, data] of holdingsEntries) {
       const sym = `${coin}USDT`;
-      const curPrice = prices[sym] ? parseFloat(prices[sym].lastPrice) : (data.avgPrice || 0);
+      const liveCoinData = marketScanResults.find(m => m.symbol === sym);
+      const curPrice = liveCoinData ? liveCoinData.price : (data.avgPrice || 0);
       const val = data.amount * curPrice;
       const cost = data.amount * data.avgPrice;
       const unrealizedPnl = val - cost;
@@ -72,8 +149,7 @@ async function updateDashboard() {
         curPrice,
         val,
         unrealizedPnl,
-        unrealizedPnlPct,
-        boughtAt: data.boughtAt || '-'
+        unrealizedPnlPct
       });
     }
 
@@ -82,7 +158,7 @@ async function updateDashboard() {
     const profitPercent = ((netProfit / (account.initialBalance || 10000)) * 100).toFixed(2);
     const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
 
-    // 1. Metric Cards
+    // 1. Update Portfolio Metric Cards
     document.getElementById('val-portfolio').textContent = `$${totalPortfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-cash').textContent = `Cash: $${(account.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT`;
     
@@ -97,23 +173,7 @@ async function updateDashboard() {
     document.getElementById('val-holdings-val').textContent = `$${holdingsValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     document.getElementById('val-holdings-count').textContent = `${holdingsEntries.length} active position${holdingsEntries.length === 1 ? '' : 's'}`;
 
-    // Mode Selector
-    const modeSelect = document.getElementById('chart-mode-select');
-    if (document.activeElement !== modeSelect && account.chartMode) {
-      modeSelect.value = account.chartMode;
-    }
-
-    autoTradingEnabled = account.autoTradingEnabled ?? true;
-    const botBtn = document.getElementById('toggle-bot-btn');
-    if (autoTradingEnabled) {
-      botBtn.className = 'bot-btn active';
-      botBtn.innerHTML = '<span class="dot"></span> BOT ACTIVE (24/7)';
-    } else {
-      botBtn.className = 'bot-btn inactive';
-      botBtn.innerHTML = '<span class="dot"></span> BOT PAUSED';
-    }
-
-    // 2. Render Active Open Holdings Table
+    // 2. Render Active Holdings
     const holdingsTbody = document.getElementById('holdings-tbody');
     if (holdingsTbody) {
       if (activeHoldingsData.length > 0) {
@@ -136,31 +196,23 @@ async function updateDashboard() {
       }
     }
 
-    // 3. Render Market Scanner Table (Proper 6 Columns Aligned)
+    // 3. Render Real-Time Market Table Directly Synchronized with Pine Script
     const tbody = document.getElementById('market-tbody');
-    if (tbody && Object.keys(prices).length > 0) {
-      tbody.innerHTML = SYMBOLS.map(symbol => {
-        const item = prices[symbol] || { lastPrice: '0', priceChangePercent: '0' };
-        const price = parseFloat(item.lastPrice);
-        const changePct = parseFloat(item.priceChangePercent);
-        const isUp = changePct >= 0;
+    if (tbody && marketScanResults.length > 0) {
+      tbody.innerHTML = marketScanResults.map(item => {
+        const isUp = item.priceChangePercent >= 0;
         const changeClass = isUp ? 'positive-change' : 'negative-change';
         const changeSign = isUp ? '+' : '';
-
-        // Exact indicator calculation from cloud scanner
-        const scan = marketScan[symbol];
-        const candleColor = scan ? scan.candleColor : (isUp ? 'green' : 'red');
-        const brickSizeDisplay = scan && scan.brickSize ? `$${Number(scan.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}` : '-';
-        const action = scan ? scan.signal : 'HOLD';
+        const price = item.price;
 
         return `
           <tr>
-            <td><span class="coin-badge">${symbol}</span></td>
+            <td><span class="coin-badge">${item.symbol}</span></td>
             <td class="price-text">$${price >= 1 ? price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : price.toFixed(5)}</td>
-            <td class="${changeClass}">${changeSign}${changePct.toFixed(2)}%</td>
-            <td><span class="state-tag state-${candleColor}">${candleColor}</span></td>
-            <td class="price-text">${brickSizeDisplay}</td>
-            <td><span class="signal-tag signal-${action}">${action}</span></td>
+            <td class="${changeClass}">${changeSign}${item.priceChangePercent.toFixed(2)}%</td>
+            <td><span class="state-tag state-${item.candleColor}">${item.candleColor}</span></td>
+            <td class="price-text">$${Number(item.brickSize).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+            <td><span class="signal-tag signal-${item.actionBadge.replace(' ', '_')}">${item.actionBadge}</span></td>
           </tr>
         `;
       }).join('');
@@ -174,7 +226,7 @@ async function updateDashboard() {
           <div class="feed-item">
             <div class="feed-desc">
               <strong>${sig.symbol}</strong>
-              <span class="feed-sub">${sig.time} · ${sig.mode || 'Line Break'}</span>
+              <span class="feed-sub">${sig.time} · Line Break Style</span>
             </div>
             <div style="text-align: right;">
               <span class="signal-tag signal-${sig.signal}">${sig.signal}</span>
@@ -221,6 +273,6 @@ async function updateDashboard() {
   }
 }
 
-// Initial fetch and poll every 5 seconds
+// Live update every 4 seconds directly in your browser
 updateDashboard();
-setInterval(updateDashboard, 5000);
+setInterval(updateDashboard, 4000);
