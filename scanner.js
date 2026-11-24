@@ -69,23 +69,28 @@ function fetchJSON(url) {
   });
 }
 
+// ----------------------------------------------------------------------
+// 100% PURE PINESCRIPT TRANSLATION: "All Charts · Sadeeq_Trading"
+// Options: Normal, Heikin Ashi, Wickless, Renko Style, Line Break Style
+// ----------------------------------------------------------------------
+
+// TradingView ta.atr() calculation using RMA (Wilder) smoothing
 function calculateATR(highs, lows, closes, period = 14) {
-  if (closes.length < 2) return 1;
-  const trs = [];
-  for (let i = 1; i < closes.length; i++) {
-    const tr = Math.max(
+  const len = closes.length;
+  if (len < period + 1) return 1;
+  const tr = [highs[0] - lows[0]];
+  for (let i = 1; i < len; i++) {
+    tr.push(Math.max(
       highs[i] - lows[i],
       Math.abs(highs[i] - closes[i - 1]),
       Math.abs(lows[i] - closes[i - 1])
-    );
-    trs.push(tr);
+    ));
   }
-  if (trs.length < period) {
-    return trs.reduce((a, b) => a + b, 0) / trs.length;
-  }
-  let atr = trs.slice(period).reduce((a, b) => a + b, 0) / period;
-  for (let i = period; i < trs.length; i++) {
-    atr = (atr * (period - 1) + trs[i]) / period;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += tr[i];
+  let atr = sum / period;
+  for (let i = period; i < len; i++) {
+    atr = (atr * (period - 1) + tr[i]) / period;
   }
   return atr;
 }
@@ -104,63 +109,84 @@ function processSadeeqIndicator(opens, highs, lows, closes, mode = "Line Break S
     cOpen = opens;
     cClose = closes;
   } else if (mode === "Heikin Ashi") {
-    let haOpen = (opens[0] + closes[0]) / 2;
+    let haOpen = (opens[0] + closes[0]) / 2.0;
     for (let i = 0; i < len; i++) {
-      const haClose = (opens[i] + highs[i] + lows[i] + closes[i]) / 4;
+      const haClose = (opens[i] + highs[i] + lows[i] + closes[i]) / 4.0;
       if (i > 0) {
-        haOpen = (haOpen + (opens[i - 1] + highs[i - 1] + lows[i - 1] + closes[i - 1]) / 4) / 2;
+        haOpen = (haOpen + cClose[i - 1]) / 2.0;
       }
       cOpen.push(haOpen);
       cClose.push(haClose);
     }
-  } else if (mode === "Line Break Style") {
-    let trend = closes[0] >= opens[0] ? 1 : -1;
-    let lastBoxClose = closes[0];
+  } else if (mode === "Wickless") {
     for (let i = 0; i < len; i++) {
-      const c = closes[i];
-      if (trend === 1) {
-        if (c > lastBoxClose + brick) {
-          lastBoxClose = c;
-        } else if (c < lastBoxClose - (brick * 2)) {
-          trend = -1;
-          lastBoxClose = c;
-        }
-      } else {
-        if (c < lastBoxClose - brick) {
-          lastBoxClose = c;
-        } else if (c > lastBoxClose + (brick * 2)) {
-          trend = 1;
-          lastBoxClose = c;
-        }
+      const prevClose = i > 0 ? closes[i - 1] : opens[0];
+      const curClose = closes[i];
+      cOpen.push(prevClose);
+      cClose.push(curClose);
+    }
+  } else if (mode === "Renko Style") {
+    // Exact Pine Script:
+    // rClose := na(rClose[1]) ? close : close >= rClose[1] + brick ? rClose[1] + brick : close <= rClose[1] - brick ? rClose[1] - brick : rClose[1]
+    // rOpen := na(rOpen[1]) ? close : rClose != rClose[1] ? rClose[1] : rOpen[1]
+    let rClose = closes[0];
+    let rOpen = closes[0];
+    for (let i = 0; i < len; i++) {
+      const cur = closes[i];
+      const prevRClose = rClose;
+      if (cur >= prevRClose + brick) {
+        rClose = prevRClose + brick;
+      } else if (cur <= prevRClose - brick) {
+        rClose = prevRClose - brick;
       }
-      cOpen.push(trend === 1 ? lastBoxClose - brick : lastBoxClose + brick);
-      cClose.push(lastBoxClose);
+      if (rClose !== prevRClose) {
+        rOpen = prevRClose;
+      }
+      cOpen.push(rOpen);
+      cClose.push(rClose);
     }
   } else {
-    let renkoClose = closes[0];
+    // 5 · LINE BREAK STYLE (Exact Pine Script):
+    // lbClose := na(lbClose[1]) ? close : math.abs(close - lbClose[1]) >= brick ? close : lbClose[1]
+    // lbOpen := na(lbOpen[1]) ? close : lbClose != lbClose[1] ? lbClose[1] : lbOpen[1]
+    let lbClose = closes[0];
+    let lbOpen = closes[0];
     for (let i = 0; i < len; i++) {
-      const c = closes[i];
-      if (c >= renkoClose + brick) {
-        renkoClose += brick;
-        cOpen.push(renkoClose - brick);
-        cClose.push(renkoClose);
-      } else if (c <= renkoClose - brick) {
-        renkoClose -= brick;
-        cOpen.push(renkoClose + brick);
-        cClose.push(renkoClose);
-      } else {
-        cOpen.push(cOpen[cOpen.length - 1] || c);
-        cClose.push(renkoClose);
+      const cur = closes[i];
+      const prevLbClose = lbClose;
+      if (Math.abs(cur - prevLbClose) >= brick) {
+        lbClose = cur;
       }
+      if (lbClose !== prevLbClose) {
+        lbOpen = prevLbClose;
+      }
+      cOpen.push(lbOpen);
+      cClose.push(lbClose);
     }
   }
 
-  const currColor = cClose[len - 1] >= cOpen[len - 1] ? 'green' : 'red';
-  const prevColor = cClose[len - 2] >= cOpen[len - 2] ? 'green' : 'red';
+  // Exact Pine Script Signals:
+  // isUp = cClose >= cOpen
+  // isDown = cClose < cOpen
+  // longSig = isUp and not isUp[1]
+  // shortSig = isDown and not isDown[1]
+  const isUp = [];
+  for (let i = 0; i < len; i++) {
+    isUp.push(cClose[i] >= cOpen[i]);
+  }
+
+  const lastIdx = len - 1;
+  const prevIdx = len - 2;
+
+  const longSig = isUp[lastIdx] && !isUp[prevIdx];
+  const shortSig = !isUp[lastIdx] && isUp[prevIdx];
 
   let signal = 'HOLD';
-  if (prevColor === 'red' && currColor === 'green') signal = 'BUY';
-  else if (prevColor === 'green' && currColor === 'red') signal = 'SELL';
+  if (longSig) signal = 'BUY';
+  else if (shortSig) signal = 'SELL';
+
+  const currColor = isUp[lastIdx] ? 'green' : 'red';
+  const prevColor = isUp[prevIdx] ? 'green' : 'red';
 
   return {
     signal,
