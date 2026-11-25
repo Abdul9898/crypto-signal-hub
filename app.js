@@ -1,95 +1,60 @@
-import { SYMBOLS, DEFAULT_CHART_MODE, processIndicator, formatPrice } from './indicators.js';
+import { SYMBOLS, DEFAULT_CHART_MODE, CHART_MODES, formatPrice, processIndicator } from './indicators.js';
 
-const MODE_DESCRIPTIONS = {
-  'Wickless SuperTrend': {
-    badge: 'WICKLESS SUPERTREND',
-    html: '<strong>Pure Wickless SuperTrend Engine:</strong> Eliminates stop-hunt wick fakeouts using pure close-to-close bodies (<code>wOpen = close[1]</code>, <code>wClose = close</code>) with dynamic Wilder ATR(10) x 2.0 trailing bands. Fires <strong>LONG</strong> on fast upside breakouts and <strong>SHORT / CLOSE</strong> on trend breakdown.'
-  },
-  'Line Break Style': {
-    badge: 'SADEEQ_TRADING RULES',
-    html: '<strong>Line Break Style Strategy:</strong> Uses dynamic ATR(14) x 0.5 Line Break bricks. Fires <strong>LONG</strong> when candle turns <strong>Green</strong> and <strong>SHORT / CLOSE</strong> when candle turns <strong>Red</strong>.'
-  },
-  'Renko Style': {
-    badge: 'RENKO STYLE',
-    html: '<strong>ATR Renko Brick Strategy:</strong> Filters micro-noise into fixed ATR(14) x 0.5 blocks. Flips color only on full brick breakouts.'
-  },
-  'Heikin Ashi': {
-    badge: 'HEIKIN ASHI',
-    html: '<strong>Heikin Ashi Trend Smoothing:</strong> Averages OHLC bodies to highlight sustained momentum waves.'
-  },
-  'Wickless': {
-    badge: 'WICKLESS BODIES',
-    html: '<strong>Pure Wickless Bodies:</strong> Plots only close-to-close directional momentum with wicks completely removed.'
-  },
-  'Normal': {
-    badge: 'NORMAL CANDLESTICK',
-    html: '<strong>Standard Candlestick Color Flip:</strong> Direct OHLC candle direction flips.'
-  }
-};
-
-let autoTradingEnabled = true;
-let isLocalApi = false;
-let isUpdating = false;
-let lastKlineFetchAt = 0;
 let liveIndicatorCache = {};
-let userSelectedMode = localStorage.getItem('preferredChartMode') || null;
+let previousStateHash = '';
+let currentMode = localStorage.getItem('crypto_chart_mode') || DEFAULT_CHART_MODE;
 
-function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 4000) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
-}
-
-function updateStrategyBanner(mode) {
-  const info = MODE_DESCRIPTIONS[mode] || MODE_DESCRIPTIONS[DEFAULT_CHART_MODE];
-  const labelEl = document.getElementById('scanner-mode-label');
-  const badgeEl = document.getElementById('strategy-badge');
-  const descEl = document.getElementById('strategy-desc');
-  if (labelEl) labelEl.textContent = mode;
-  if (badgeEl) badgeEl.textContent = info.badge;
-  if (descEl) descEl.innerHTML = info.html;
-}
-
-async function loadStateData() {
   try {
-    const stateRes = await fetchWithTimeout('./state.json?t=' + Date.now(), {}, 3000);
-    if (stateRes.ok) {
-      isLocalApi = false;
-      return await stateRes.json();
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return res;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
+  }
+}
+
+async function fetchMarketTickers() {
+  try {
+    const res = await fetchWithTimeout('https://data-api.binance.vision/api/v3/ticker/24hr', {}, 3500);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const map = {};
+    for (const item of data) {
+      if (SYMBOLS.includes(item.symbol)) {
+        map[item.symbol] = item;
+      }
+    }
+    return map;
+  } catch (err) {
+    console.warn('Ticker fetch fallback:', err.message);
+    return {};
+  }
+}
+
+async function fetchState() {
+  try {
+    const res = await fetchWithTimeout(`./state.json?_t=${Date.now()}`, { cache: 'no-store' }, 3000);
+    if (res.ok) {
+      return await res.json();
     }
   } catch (e) {
-    // Fallback below to local API if running via server.js
-  }
-
-  try {
-    const [statsRes, marketRes] = await Promise.all([
-      fetchWithTimeout('/api/stats', {}, 3000),
-      fetchWithTimeout('/api/market', {}, 3000)
-    ]);
-    if (statsRes.ok && marketRes.ok) {
-      isLocalApi = true;
-      const stats = await statsRes.json();
-      const market = await marketRes.json();
-      const marketScan = {};
-      for (const item of market.marketData || []) {
-        marketScan[item.symbol] = {
-          symbol: item.symbol,
-          price: item.currentPrice,
-          candleColor: (item.candleColor || 'green').toLowerCase(),
-          brickSize: item.brickSize,
-          stopLevel: item.stopLevel ?? null,
-          signal: item.action === 'LONG' ? 'BUY' : (item.action === 'SHORT' ? 'SELL' : 'HOLD'),
-          mode: stats.chartMode
+    // Try local node server api if on local host
+    try {
+      const apiRes = await fetchWithTimeout('/api/stats', {}, 2000);
+      if (apiRes.ok) {
+        const stats = await apiRes.json();
+        return {
+          account: stats.account,
+          marketScan: stats.marketData,
+          recentSignals: stats.recentSignals,
+          lastUpdated: stats.lastUpdated
         };
       }
-      return {
-        account: stats,
-        recentSignals: market.recentSignals || [],
-        marketScan
-      };
-    }
-  } catch (e) {
-    console.warn('State/API load failed:', e.message);
+    } catch (_) {}
   }
   return null;
 }
@@ -124,8 +89,9 @@ function renderDashboard(state, tickers, activeMode) {
     };
   });
 
-  // Portfolio & Holdings Valuation
+  // Portfolio & Holdings Valuation (Bi-directional Support: LONG & SHORT)
   let holdingsValue = 0;
+  let totalMarginLocked = 0;
   const holdingsEntries = Object.entries(holdings);
   const activeHoldingsData = [];
 
@@ -133,17 +99,35 @@ function renderDashboard(state, tickers, activeMode) {
     const sym = `${coin}USDT`;
     const liveCoinData = marketScanResults.find(m => m.symbol === sym);
     const curPrice = liveCoinData && liveCoinData.price > 0 ? liveCoinData.price : (data.avgPrice || 0);
-    const val = data.amount * curPrice;
-    const cost = data.amount * data.avgPrice;
-    const unrealizedPnl = val - cost;
-    const unrealizedPnlPct = cost > 0 ? ((unrealizedPnl / cost) * 100).toFixed(2) : '0.00';
+    const isLong = (data.side || 'LONG') === 'LONG';
+    const initialMargin = data.initialMargin || (data.amount * data.avgPrice);
+    totalMarginLocked += initialMargin;
 
-    holdingsValue += val;
+    let unrealizedPnl = 0;
+    let unrealizedPnlPct = '0.00';
+    let currentVal = initialMargin;
+
+    if (isLong) {
+      currentVal = data.amount * curPrice;
+      const cost = data.amount * data.avgPrice;
+      unrealizedPnl = currentVal - cost;
+      unrealizedPnlPct = cost > 0 ? ((unrealizedPnl / cost) * 100).toFixed(2) : '0.00';
+    } else {
+      // Short position calculation
+      const entryVal = data.amount * data.avgPrice;
+      const exitVal = data.amount * curPrice;
+      unrealizedPnl = entryVal - exitVal;
+      unrealizedPnlPct = entryVal > 0 ? ((unrealizedPnl / entryVal) * 100).toFixed(2) : '0.00';
+      currentVal = Math.max(0, entryVal + unrealizedPnl);
+    }
+
+    holdingsValue += currentVal;
     activeHoldingsData.push({
       coin,
+      side: data.side || 'LONG',
       amount: data.amount,
       avgPrice: data.avgPrice,
-      val,
+      val: currentVal,
       unrealizedPnl,
       unrealizedPnlPct
     });
@@ -178,9 +162,13 @@ function renderDashboard(state, tickers, activeMode) {
         const isPnlPositive = h.unrealizedPnl >= 0;
         const pnlClass = isPnlPositive ? 'positive-change' : 'negative-change';
         const pnlSign = isPnlPositive ? '+' : '';
+        const sideBadgeClass = h.side === 'LONG' ? 'signal-BUY' : 'signal-SELL';
         return `
           <tr>
-            <td><span class="coin-badge">${h.coin}</span></td>
+            <td>
+              <span class="coin-badge">${h.coin}</span>
+              <span class="signal-tag ${sideBadgeClass}" style="margin-left: 6px; padding: 2px 6px; font-size: 0.7rem;">${h.side}</span>
+            </td>
             <td>${h.amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} ${h.coin}</td>
             <td class="price-text">${formatPrice(h.avgPrice)}</td>
             <td class="price-text">${formatPrice(h.val)}</td>
@@ -249,18 +237,19 @@ function renderDashboard(state, tickers, activeMode) {
     if (tradeHistory.length > 0) {
       tradeList.innerHTML = tradeHistory.map(tr => {
         const actionName = tr.action || tr.type || 'TRADE';
-        const isClose = actionName.includes('CLOSE') || actionName.includes('SHORT') || tr.type === 'SELL';
+        const isClose = actionName.includes('CLOSE');
         const pnlVal = tr.pnl || 0;
         const pnlClass = pnlVal >= 0 ? 'positive-change' : 'negative-change';
         const pnlSign = pnlVal >= 0 ? '+' : '';
-        const pnlText = isClose && tr.pnl !== undefined ? `<span class="${pnlClass}" style="display:block; font-size: 0.75rem;">${pnlSign}${formatPrice(pnlVal)}</span>` : '';
-        const badgeClass = actionName.includes('LONG') || actionName.includes('BUY') ? 'signal-BUY' : 'signal-SELL';
+        const pnlText = isClose && tr.pnl !== undefined ? `<span class="${pnlClass}" style="display:block; font-size: 0.75rem;">${pnlSign}${formatPrice(pnlVal)} (${pnlSign}${tr.pnlPercent || 0}%)</span>` : '';
+        const badgeClass = actionName.includes('LONG') ? 'signal-BUY' : 'signal-SELL';
 
         return `
           <div class="feed-item">
             <div class="feed-desc">
               <strong>${actionName} ${tr.symbol}</strong>
               <span class="feed-sub">${tr.amount || ''} @ ${formatPrice(tr.price || tr.exitPrice || 0)} · ${tr.time}</span>
+              <span class="feed-sub" style="display:block; font-size: 0.7rem; color: var(--text-muted);">${tr.reason || ''}</span>
             </div>
             <div style="text-align: right;">
               <span class="signal-tag ${badgeClass}">${actionName}</span>
@@ -302,129 +291,107 @@ async function refreshLiveIndicators(state, activeMode) {
         superTrendFactor: account.superTrendFactor || 2.0,
         superTrendAtrLen: account.superTrendAtrLen || 10
       });
-      if (!ind) return null;
-      return { sym, price: closes[closes.length - 1], ...ind };
+
+      return {
+        symbol: sym,
+        price: closes[closes.length - 1],
+        currColor: ind.currColor,
+        brickSize: ind.brickSize,
+        stopLevel: ind.stopLevel,
+        atr: ind.atr,
+        signal: ind.signal
+      };
     })
   );
 
-  const nextCache = { _mode: activeMode };
-  let updatedCount = 0;
+  const newCache = { _mode: activeMode };
   for (const r of results) {
     if (r.status === 'fulfilled' && r.value) {
-      nextCache[r.value.sym] = r.value;
-      updatedCount++;
+      newCache[r.value.symbol] = r.value;
     }
   }
-  if (updatedCount > 0) {
-    liveIndicatorCache = nextCache;
-    lastKlineFetchAt = Date.now();
-  }
-  return updatedCount > 0;
+  liveIndicatorCache = newCache;
 }
 
-async function updateDashboard(forceKlines = false) {
-  if (isUpdating) return;
-  isUpdating = true;
+function updateStrategyBanner(mode) {
+  const banner = document.getElementById('strategy-banner');
+  if (!banner) return;
 
-  try {
-    const state = await loadStateData();
-    if (!state || !state.account) return;
-
-    const { account } = state;
-    const activeMode = userSelectedMode || account.chartMode || DEFAULT_CHART_MODE;
-
-    const modeSelect = document.getElementById('chart-mode-select');
-    if (modeSelect && document.activeElement !== modeSelect) {
-      modeSelect.value = activeMode;
-    }
-    updateStrategyBanner(activeMode);
-
-    autoTradingEnabled = account.autoTradingEnabled ?? true;
-    const botBtn = document.getElementById('toggle-bot-btn');
-    if (botBtn) {
-      botBtn.className = autoTradingEnabled ? 'bot-btn active' : 'bot-btn inactive';
-      botBtn.innerHTML = autoTradingEnabled ? '<span class="dot"></span> BOT ACTIVE' : '<span class="dot"></span> BOT PAUSED';
-    }
-
-    // Immediate paint from state before waiting on external Binance API
-    renderDashboard(state, {}, activeMode);
-
-    // Fetch live 24h prices with strict timeout
-    let tickers = {};
-    try {
-      const tickerRes = await fetchWithTimeout('https://data-api.binance.vision/api/v3/ticker/24hr', {}, 3500);
-      if (tickerRes.ok) {
-        const allTickers = await tickerRes.json();
-        allTickers.forEach(t => {
-          if (SYMBOLS.includes(t.symbol)) tickers[t.symbol] = t;
-        });
-      }
-    } catch (e) {
-      console.warn('Ticker fetch fallback:', e.message);
-    }
-
-    renderDashboard(state, tickers, activeMode);
-
-    // Refresh full kline indicator calculations every 15s (avoids mobile throttling)
-    if (forceKlines || Date.now() - lastKlineFetchAt > 15000 || liveIndicatorCache._mode !== activeMode) {
-      const updated = await refreshLiveIndicators(state, activeMode);
-      if (updated) {
-        renderDashboard(state, tickers, activeMode);
-      }
-    }
-  } catch (err) {
-    console.error('Error rendering dashboard:', err);
-  } finally {
-    isUpdating = false;
+  if (mode === 'Wickless SuperTrend') {
+    banner.innerHTML = `
+      <div class="strategy-badge">WICKLESS SUPERTREND + TP/SL SCALPER</div>
+      <div class="strategy-desc">
+        <strong>Bi-Directional Futures Scalper:</strong> Pure close-to-close momentum without wick fakeouts.
+        Locks profit at <strong>+1.2% TP</strong>, protects capital with <strong>-1.0% SL</strong>, and profits from both bull & bear trends (Long & Short).
+      </div>
+    `;
+  } else {
+    banner.innerHTML = `
+      <div class="strategy-badge">SADEEQ_TRADING RULES</div>
+      <div class="strategy-desc">
+        <strong>${mode} Strategy:</strong> Dynamic brick calculation. Fires <strong>LONG</strong> when candle turns <strong>Green</strong> and <strong>SHORT / CLOSE</strong> when candle turns <strong>Red</strong>.
+      </div>
+    `;
   }
 }
 
-// Interactive UI Controls
-document.getElementById('chart-mode-select')?.addEventListener('change', async (e) => {
-  const chosenMode = e.target.value;
-  userSelectedMode = chosenMode;
-  localStorage.setItem('preferredChartMode', chosenMode);
-  updateStrategyBanner(chosenMode);
-
-  if (isLocalApi) {
-    try {
-      await fetch('/api/set-mode', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chartMode: chosenMode })
-      });
-    } catch (err) {
-      console.warn('Local mode update skipped:', err.message);
-    }
+async function mainLoop() {
+  const modeSelector = document.getElementById('chart-mode-select');
+  if (modeSelector && modeSelector.value !== currentMode) {
+    modeSelector.value = currentMode;
   }
-  updateDashboard(true);
+  updateStrategyBanner(currentMode);
+
+  // 1. Fetch State
+  const state = await fetchState() || {
+    account: {
+      initialBalance: 10000,
+      balance: 10000,
+      holdings: {},
+      tradeHistory: [],
+      totalTrades: 0,
+      winningTrades: 0,
+      chartMode: currentMode
+    },
+    marketScan: {},
+    recentSignals: []
+  };
+
+  // 2. Fetch Tickers
+  const tickers = await fetchMarketTickers();
+
+  // 3. Immediate Fast Render
+  renderDashboard(state, tickers, currentMode);
+
+  // 4. Background Indicator Refresh
+  refreshLiveIndicators(state, currentMode).then(() => {
+    renderDashboard(state, tickers, currentMode);
+  }).catch(() => {});
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const modeSelector = document.getElementById('chart-mode-select');
+  if (modeSelector) {
+    modeSelector.value = currentMode;
+    modeSelector.addEventListener('change', (e) => {
+      currentMode = e.target.value;
+      localStorage.setItem('crypto_chart_mode', currentMode);
+      updateStrategyBanner(currentMode);
+      liveIndicatorCache = {};
+      mainLoop();
+    });
+  }
+
+  const resetBtn = document.getElementById('reset-btn');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      if (confirm('Reset paper trading balance to $10,000.00?')) {
+        localStorage.clear();
+        window.location.reload();
+      }
+    });
+  }
+
+  mainLoop();
+  setInterval(mainLoop, 15000);
 });
-
-document.getElementById('toggle-bot-btn')?.addEventListener('click', async () => {
-  if (!isLocalApi) return;
-  try {
-    await fetch('/api/toggle-bot', { method: 'POST' });
-    updateDashboard();
-  } catch (err) {
-    console.warn('Toggle bot error:', err.message);
-  }
-});
-
-document.getElementById('reset-account-btn')?.addEventListener('click', async () => {
-  if (!isLocalApi) {
-    localStorage.removeItem('preferredChartMode');
-    userSelectedMode = null;
-    updateDashboard(true);
-    return;
-  }
-  try {
-    await fetch('/api/reset', { method: 'POST' });
-    updateDashboard(true);
-  } catch (err) {
-    console.warn('Reset error:', err.message);
-  }
-});
-
-// Initial run + poll every 4 seconds
-updateDashboard(true);
-setInterval(() => updateDashboard(false), 4000);

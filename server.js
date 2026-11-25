@@ -9,7 +9,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = 3000;
 
-// In-Memory Paper Trading State & Simulated Account
+// Profit & Risk Constants
+const TAKE_PROFIT_PCT = 1.2;
+const STOP_LOSS_PCT = 1.0;
+
 let account = {
   initialBalance: 10000.0,
   balance: 10000.0,
@@ -24,13 +27,16 @@ let account = {
   atrPeriod: 14,
   superTrendFactor: 2.0,
   superTrendAtrLen: 10,
-  timeframe: '3m'
+  timeframe: '3m',
+  takeProfitPct: TAKE_PROFIT_PCT,
+  stopLossPct: STOP_LOSS_PCT,
+  enableShorting: true
 };
 
 let marketData = {};
 let recentSignals = [];
 
-function fetchJSON(url, timeoutMs = 10000) {
+function fetchJSON(url, timeoutMs = 7000) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, { headers: { 'User-Agent': 'CryptoSignalHub/2.0' } }, (res) => {
       let data = '';
@@ -48,20 +54,107 @@ function fetchJSON(url, timeoutMs = 10000) {
   });
 }
 
-// Market Scanner
+function closePosition(coin, symbol, price, reason) {
+  const pos = account.holdings[coin];
+  if (!pos) return null;
+
+  const isLong = (pos.side || 'LONG') === 'LONG';
+  let pnl = 0;
+  let pnlPercent = 0;
+  let returnedCapital = 0;
+
+  if (isLong) {
+    const revenue = pos.amount * price;
+    const cost = pos.amount * pos.avgPrice;
+    pnl = revenue - cost;
+    pnlPercent = cost > 0 ? (pnl / cost) * 100 : 0;
+    returnedCapital = revenue;
+  } else {
+    const entryVal = pos.amount * pos.avgPrice;
+    const exitVal = pos.amount * price;
+    pnl = entryVal - exitVal;
+    pnlPercent = entryVal > 0 ? (pnl / entryVal) * 100 : 0;
+    returnedCapital = entryVal + pnl;
+  }
+
+  account.balance += Math.max(0, returnedCapital);
+  account.totalTrades++;
+  if (pnl > 0) account.winningTrades++;
+
+  const actionType = isLong ? 'CLOSE LONG' : 'CLOSE SHORT';
+  const timestamp = new Date().toLocaleTimeString();
+
+  account.tradeHistory.unshift({
+    id: Date.now(),
+    symbol,
+    type: actionType,
+    action: actionType,
+    price,
+    amount: Number(pos.amount.toFixed(4)),
+    totalUSDT: Number((pos.amount * price).toFixed(2)),
+    time: timestamp,
+    pnl: Number(pnl.toFixed(2)),
+    pnlPercent: Number(pnlPercent.toFixed(2)),
+    reason
+  });
+
+  delete account.holdings[coin];
+  if (account.tradeHistory.length > 60) account.tradeHistory.pop();
+  return pnl;
+}
+
+function openPosition(coin, symbol, side, price, reason) {
+  if (account.holdings[coin]) return;
+
+  const allocation = account.balance * (account.riskPerTradePercent / 100);
+  if (allocation < 15 || account.balance < allocation) return;
+
+  const amount = allocation / price;
+  account.balance -= allocation;
+  const timestamp = new Date().toLocaleTimeString();
+
+  account.holdings[coin] = {
+    side,
+    amount,
+    avgPrice: price,
+    boughtAt: timestamp,
+    initialMargin: allocation
+  };
+
+  account.totalTrades++;
+  account.tradeHistory.unshift({
+    id: Date.now(),
+    symbol,
+    type: side,
+    action: side,
+    price,
+    amount: Number(amount.toFixed(4)),
+    totalUSDT: Number(allocation.toFixed(2)),
+    time: timestamp,
+    pnl: 0,
+    pnlPercent: 0,
+    reason
+  });
+
+  if (account.tradeHistory.length > 60) account.tradeHistory.pop();
+}
+
 async function scanMarket() {
+  const tpPct = account.takeProfitPct || TAKE_PROFIT_PCT;
+  const slPct = account.stopLossPct || STOP_LOSS_PCT;
+
   for (const symbol of SYMBOLS) {
     try {
-      const klines = await fetchJSON(`https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${account.timeframe || '3m'}&limit=150`);
-      if (!Array.isArray(klines)) continue;
+      const klineUrl = `https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${account.timeframe}&limit=150`;
+      const data = await fetchJSON(klineUrl);
 
-      const opens = klines.map(k => parseFloat(k[1]));
-      const highs = klines.map(k => parseFloat(k[2]));
-      const lows = klines.map(k => parseFloat(k[3]));
-      const closes = klines.map(k => parseFloat(k[4]));
+      if (!Array.isArray(data) || data.length < 20) continue;
 
+      const opens = data.map(d => parseFloat(d[1]));
+      const highs = data.map(d => parseFloat(d[2]));
+      const lows = data.map(d => parseFloat(d[3]));
+      const closes = data.map(d => parseFloat(d[4]));
       const currentPrice = closes[closes.length - 1];
-      const priceChange24h = ((currentPrice - closes[0]) / closes[0] * 100).toFixed(2);
 
       const indicatorRes = processIndicator(opens, highs, lows, closes, {
         mode: account.chartMode,
@@ -73,66 +166,77 @@ async function scanMarket() {
 
       if (!indicatorRes) continue;
 
-      const candleColorUpper = indicatorRes.currColor.toUpperCase();
-      let action = 'NEUTRAL';
-      let confidence = 60;
-      let reason = `Holding ${candleColorUpper} ${account.chartMode}`;
-
-      if (indicatorRes.longSig) {
-        action = 'LONG';
-        confidence = 88;
-        reason = `Flipped GREEN [${account.chartMode}]`;
-      } else if (indicatorRes.shortSig) {
-        action = 'SHORT';
-        confidence = 88;
-        reason = `Flipped RED [${account.chartMode}]`;
-      } else if (candleColorUpper === 'GREEN') {
-        action = 'BULLISH';
-        reason = `Sustained Green [${account.chartMode}]`;
-      } else {
-        action = 'BEARISH';
-        reason = `Sustained Red [${account.chartMode}]`;
-      }
+      const candleColorUpper = (indicatorRes.currColor || 'green').toUpperCase();
 
       marketData[symbol] = {
         symbol,
-        currentPrice,
-        priceChange24h,
+        price: currentPrice,
         candleColor: indicatorRes.currColor,
-        cOpen: indicatorRes.cOpen,
-        cClose: indicatorRes.cClose,
-        brickSize: indicatorRes.brickSize,
+        brickSize: indicatorRes.brick,
         stopLevel: indicatorRes.stopLevel,
-        action,
-        confidence,
-        reason,
-        timestamp: new Date().toISOString()
+        atr: indicatorRes.atr,
+        signal: indicatorRes.signal,
+        mode: account.chartMode,
+        updatedAt: new Date().toLocaleTimeString()
       };
 
       const coin = symbol.replace('USDT', '');
-      const shouldEnterLong = indicatorRes.longSig || (candleColorUpper === 'GREEN' && !account.holdings[coin]);
-      const shouldExit = indicatorRes.shortSig || (candleColorUpper === 'RED' && account.holdings[coin]);
+      const pos = account.holdings[coin];
 
-      if (shouldEnterLong || shouldExit) {
-        const signalObj = {
-          id: Date.now() + Math.random().toString(36).substr(2, 4),
-          symbol,
-          action: shouldEnterLong ? 'LONG' : 'SHORT',
-          price: currentPrice,
-          confidence,
-          reason: shouldEnterLong ? `Green Entry [${account.chartMode}]` : `Red Exit [${account.chartMode}]`,
-          time: new Date().toLocaleTimeString()
-        };
+      // TP / SL Checks
+      if (pos && account.autoTradingEnabled) {
+        const isLong = (pos.side || 'LONG') === 'LONG';
+        const priceChangePct = isLong
+          ? ((currentPrice - pos.avgPrice) / pos.avgPrice) * 100
+          : ((pos.avgPrice - currentPrice) / pos.avgPrice) * 100;
 
-        const lastSig = recentSignals[0];
-        if (!lastSig || lastSig.symbol !== symbol || lastSig.action !== signalObj.action || (Date.now() - (lastSig._timestamp || 0) > 30000)) {
-          signalObj._timestamp = Date.now();
-          recentSignals.unshift(signalObj);
+        if (priceChangePct >= tpPct) {
+          closePosition(coin, symbol, currentPrice, `Take-Profit Hit (+${priceChangePct.toFixed(2)}%)`);
+          continue;
+        } else if (priceChangePct <= -slPct) {
+          closePosition(coin, symbol, currentPrice, `Stop-Loss Protected (${priceChangePct.toFixed(2)}%)`);
+          continue;
+        }
+
+        if (isLong && (indicatorRes.currColor === 'red' || indicatorRes.signal === 'SELL')) {
+          closePosition(coin, symbol, currentPrice, `Trend Reversal (Turned Red)`);
+          continue;
+        } else if (!isLong && (indicatorRes.currColor === 'green' || indicatorRes.signal === 'BUY')) {
+          closePosition(coin, symbol, currentPrice, `Trend Reversal (Turned Green)`);
+          continue;
+        }
+      }
+
+      // New Bi-directional entry
+      const openCount = Object.keys(account.holdings).length;
+      if (!account.holdings[coin] && openCount < 6 && account.autoTradingEnabled) {
+        const isBullish = indicatorRes.currColor === 'green' || indicatorRes.signal === 'BUY';
+        const isBearish = indicatorRes.currColor === 'red' || indicatorRes.signal === 'SELL';
+
+        if (isBullish) {
+          openPosition(coin, symbol, 'LONG', currentPrice, `Green Trend [${account.chartMode}]`);
+          recentSignals.unshift({
+            symbol,
+            action: 'LONG',
+            signal: 'LONG',
+            price: currentPrice,
+            time: new Date().toLocaleTimeString(),
+            mode: `${account.timeframe} · ${account.chartMode}`,
+            reason: 'Bullish Trend Entry'
+          });
           if (recentSignals.length > 30) recentSignals.pop();
-
-          if (account.autoTradingEnabled) {
-            executePaperTrade(signalObj);
-          }
+        } else if (isBearish && account.enableShorting) {
+          openPosition(coin, symbol, 'SHORT', currentPrice, `Red Trend [${account.chartMode}]`);
+          recentSignals.unshift({
+            symbol,
+            action: 'SHORT',
+            signal: 'SHORT',
+            price: currentPrice,
+            time: new Date().toLocaleTimeString(),
+            mode: `${account.timeframe} · ${account.chartMode}`,
+            reason: 'Bearish Trend Entry (Short)'
+          });
+          if (recentSignals.length > 30) recentSignals.pop();
         }
       }
     } catch (err) {
@@ -141,191 +245,60 @@ async function scanMarket() {
   }
 }
 
-// Paper Trade Execution
-function executePaperTrade(signal) {
-  const coin = signal.symbol.replace('USDT', '');
-  const price = signal.price;
-
-  if (signal.action === 'LONG') {
-    const tradeAlloc = account.balance * (account.riskPerTradePercent / 100);
-    if (tradeAlloc > 20) {
-      const amount = tradeAlloc / price;
-      account.balance -= tradeAlloc;
-
-      if (!account.holdings[coin]) {
-        account.holdings[coin] = { amount: 0, avgPrice: 0 };
-      }
-
-      const totalCost = (account.holdings[coin].amount * account.holdings[coin].avgPrice) + tradeAlloc;
-      account.holdings[coin].amount += amount;
-      account.holdings[coin].avgPrice = totalCost / account.holdings[coin].amount;
-
-      account.totalTrades++;
-      account.tradeHistory.unshift({
-        type: 'LONG',
-        action: 'LONG',
-        symbol: signal.symbol,
-        price,
-        amount: Number(amount.toFixed(4)),
-        totalUSDT: Number(tradeAlloc.toFixed(2)),
-        time: new Date().toLocaleTimeString(),
-        pnl: 0
-      });
-    }
-  } else if (signal.action === 'SHORT') {
-    if (account.holdings[coin] && account.holdings[coin].amount > 0) {
-      const amount = account.holdings[coin].amount;
-      const avgPrice = account.holdings[coin].avgPrice;
-      const revenue = amount * price;
-      const profitLoss = revenue - (amount * avgPrice);
-
-      account.balance += revenue;
-      delete account.holdings[coin];
-
-      account.totalTrades++;
-      if (profitLoss > 0) account.winningTrades++;
-
-      account.tradeHistory.unshift({
-        type: 'CLOSE / SHORT',
-        action: 'CLOSE / SHORT',
-        symbol: signal.symbol,
-        price,
-        amount: Number(amount.toFixed(4)),
-        totalUSDT: Number(revenue.toFixed(2)),
-        time: new Date().toLocaleTimeString(),
-        pnl: Number(profitLoss.toFixed(2))
-      });
-    }
-  }
-  if (account.tradeHistory.length > 50) account.tradeHistory.pop();
-}
-
-function getPortfolioStats() {
-  let holdingsValue = 0;
-  for (const [coin, data] of Object.entries(account.holdings)) {
-    const symbol = `${coin}USDT`;
-    const curPrice = marketData[symbol]?.currentPrice || data.avgPrice;
-    holdingsValue += data.amount * curPrice;
-  }
-  const totalValue = account.balance + holdingsValue;
-  const netProfit = totalValue - account.initialBalance;
-  const profitPercent = ((netProfit / account.initialBalance) * 100).toFixed(2);
-  const winRate = account.totalTrades > 0 ? ((account.winningTrades / account.totalTrades) * 100).toFixed(1) : 0;
-
-  return {
-    initialBalance: account.initialBalance,
-    balance: Number(account.balance.toFixed(2)),
-    cashBalance: Number(account.balance.toFixed(2)),
-    holdingsValue: Number(holdingsValue.toFixed(2)),
-    totalPortfolioValue: Number(totalValue.toFixed(2)),
-    netProfit: Number(netProfit.toFixed(2)),
-    profitPercent,
-    winRate,
-    totalTrades: account.totalTrades,
-    winningTrades: account.winningTrades,
-    autoTradingEnabled: account.autoTradingEnabled,
-    chartMode: account.chartMode,
-    brickMultiplier: account.brickMultiplier,
-    atrPeriod: account.atrPeriod,
-    superTrendFactor: account.superTrendFactor,
-    superTrendAtrLen: account.superTrendAtrLen,
-    timeframe: account.timeframe,
-    holdings: account.holdings,
-    tradeHistory: account.tradeHistory.slice(0, 20)
-  };
-}
-
-// Server Endpoints
-const server = http.createServer(async (req, res) => {
+// Simple HTTP server for local testing
+const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(200);
+    res.writeHead(204);
     res.end();
     return;
   }
 
-  const reqPath = (req.url || '/').split('?')[0];
+  const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = parsedUrl.pathname;
 
-  if (reqPath === '/api/stats') {
+  if (pathname === '/api/stats') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(getPortfolioStats()));
+    res.end(JSON.stringify({ account, recentSignals, marketData, lastUpdated: new Date().toISOString() }));
     return;
   }
 
-  if (reqPath === '/api/market') {
+  if (pathname === '/state.json') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      marketData: Object.values(marketData),
-      recentSignals,
-      holdings: account.holdings,
-      tradeHistory: account.tradeHistory.slice(0, 20)
-    }));
+    res.end(JSON.stringify({ account, recentSignals, marketScan: marketData, lastUpdated: new Date().toISOString() }));
     return;
   }
 
-  if (reqPath === '/api/toggle-bot' && req.method === 'POST') {
-    account.autoTradingEnabled = !account.autoTradingEnabled;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ autoTradingEnabled: account.autoTradingEnabled }));
-    return;
+  // Serve static files
+  let filePath = path.join(__dirname, 'public', pathname === '/' ? 'index.html' : pathname);
+  if (!fs.existsSync(filePath)) {
+    filePath = path.join(__dirname, pathname === '/' ? 'index.html' : pathname);
   }
 
-  if (reqPath === '/api/set-mode' && req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(body);
-        if (data.chartMode) account.chartMode = data.chartMode;
-        if (data.brickMultiplier) account.brickMultiplier = parseFloat(data.brickMultiplier);
-        if (data.superTrendFactor) account.superTrendFactor = parseFloat(data.superTrendFactor);
-        scanMarket();
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', chartMode: account.chartMode, brickMultiplier: account.brickMultiplier }));
-      } catch (e) {
-        res.writeHead(400);
-        res.end('Invalid JSON');
-      }
-    });
-    return;
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes = {
+      '.html': 'text/html',
+      '.js': 'text/javascript',
+      '.css': 'text/css',
+      '.json': 'application/json',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg'
+    };
+    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+    fs.createReadStream(filePath).pipe(res);
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
   }
-
-  if (reqPath === '/api/reset' && req.method === 'POST') {
-    account.balance = account.initialBalance;
-    account.holdings = {};
-    account.tradeHistory = [];
-    account.totalTrades = 0;
-    account.winningTrades = 0;
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 'ok', message: 'Account reset' }));
-    return;
-  }
-
-  const filePath = path.join(__dirname, 'public', reqPath === '/' ? 'index.html' : reqPath);
-  fs.readFile(filePath, (err, content) => {
-    if (err) {
-      res.writeHead(404, { 'Content-Type': 'text/plain' });
-      res.end('Not Found');
-    } else {
-      const ext = path.extname(filePath);
-      const mimeMap = {
-        '.html': 'text/html',
-        '.css': 'text/css',
-        '.js': 'application/javascript',
-        '.json': 'application/json'
-      };
-      res.writeHead(200, { 'Content-Type': mimeMap[ext] || 'text/plain' });
-      res.end(content);
-    }
-  });
 });
 
+setInterval(scanMarket, 15000);
 scanMarket();
-setInterval(scanMarket, 10000);
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Crypto Signal Hub (${account.chartMode} Engine) on http://localhost:${PORT}`);
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
