@@ -1,28 +1,14 @@
 {
   "account": {
     "initialBalance": 10000,
-    "balance": 5373.099629036165,
+    "balance": 5385.075282851274,
     "holdings": {
-      "SHIB": {
-        "side": "SHORT",
-        "amount": 202281447.55862167,
-        "avgPrice": 0.00000365,
-        "boughtAt": "5:32:31 AM",
-        "initialMargin": 738.3272835889692
-      },
       "SOL": {
         "side": "LONG",
         "amount": 10.420778317511303,
         "avgPrice": 70.79,
         "boughtAt": "3:45:09 PM",
         "initialMargin": 737.6868970966252
-      },
-      "DOGE": {
-        "side": "SHORT",
-        "amount": 13031.814351860776,
-        "avgPrice": 0.05647,
-        "boughtAt": "3:45:09 PM",
-        "initialMargin": 735.906556449578
       },
       "XRP": {
         "side": "LONG",
@@ -44,9 +30,75 @@
         "avgPrice": 60434.01,
         "boughtAt": "3:45:23 PM",
         "initialMargin": 732.6954039594771
+      },
+      "ADA": {
+        "side": "SHORT",
+        "amount": 4929.089689579767,
+        "avgPrice": 0.1487,
+        "boughtAt": "12:06:23 AM",
+        "initialMargin": 732.9556368405113
+      },
+      "NEAR": {
+        "side": "LONG",
+        "amount": 239.81987186856216,
+        "avgPrice": 3.062,
+        "boughtAt": "12:06:24 AM",
+        "initialMargin": 734.3284476615373
       }
     },
     "tradeHistory": [
+      {
+        "id": 1795737984312,
+        "symbol": "NEARUSDT",
+        "type": "LONG",
+        "action": "LONG",
+        "price": 3.062,
+        "amount": 239.8199,
+        "totalUSDT": 734.33,
+        "time": "12:06:24 AM",
+        "pnl": 0,
+        "pnlPercent": 0,
+        "reason": "Green Trend [Wickless SuperTrend]"
+      },
+      {
+        "id": 1795737984165,
+        "symbol": "SHIBUSDT",
+        "type": "CLOSE SHORT",
+        "action": "CLOSE SHORT",
+        "price": 0.00000362,
+        "amount": 202281447.5586,
+        "totalUSDT": 732.26,
+        "time": "12:06:24 AM",
+        "pnl": 6.07,
+        "pnlPercent": 0.82,
+        "reason": "Trend Reversal (Turned Green)"
+      },
+      {
+        "id": 1795737983576,
+        "symbol": "ADAUSDT",
+        "type": "SHORT",
+        "action": "SHORT",
+        "price": 0.1487,
+        "amount": 4929.0897,
+        "totalUSDT": 732.96,
+        "time": "12:06:23 AM",
+        "pnl": 0,
+        "pnlPercent": 0,
+        "reason": "Red Trend [Wickless SuperTrend]"
+      },
+      {
+        "id": 1795737983429,
+        "symbol": "DOGEUSDT",
+        "type": "CLOSE SHORT",
+        "action": "CLOSE SHORT",
+        "price": 0.05655,
+        "amount": 13031.8144,
+        "totalUSDT": 736.95,
+        "time": "12:06:23 AM",
+        "pnl": -1.04,
+        "pnlPercent": -0.14,
+        "reason": "Trend Reversal (Turned Green)"
+      },
       {
         "id": 1795707923565,
         "symbol": "BTCUSDT",
@@ -774,62 +826,10 @@
         "pnl": 0,
         "pnlPercent": 0,
         "reason": "Red Trend [Wickless SuperTrend]"
-      },
-      {
-        "id": 1795581515767,
-        "symbol": "AVAXUSDT",
-        "type": "CLOSE LONG",
-        "action": "CLOSE LONG",
-        "price": 6.513,
-        "amount": 117.7056,
-        "totalUSDT": 766.62,
-        "time": "5:38:35 AM",
-        "pnl": -6.83,
-        "pnlPercent": -0.88,
-        "reason": "Trend Reversal (Turned Red)"
-      },
-      {
-        "id": 1795581515344,
-        "symbol": "XRPUSDT",
-        "type": "CLOSE LONG",
-        "action": "CLOSE LONG",
-        "price": 0.9203,
-        "amount": 597.8169,
-        "totalUSDT": 550.17,
-        "time": "5:38:35 AM",
-        "pnl": -7.11,
-        "pnlPercent": -1.28,
-        "reason": "Stop-Loss Protected (-1.28%)"
-      },
-      {
-        "id": 1795581514706,
-        "symbol": "ADAUSDT",
-        "type": "LONG",
-        "action": "LONG",
-        "price": 0.143,
-        "amount": 5267.2087,
-        "totalUSDT": 753.21,
-        "time": "5:38:34 AM",
-        "pnl": 0,
-        "pnlPercent": 0,
-        "reason": "Green Trend [Wickless SuperTrend]"
-      },
-      {
-        "id": 1795581514247,
-        "symbol": "DOGEUSDT",
-        "type": "CLOSE LONG",
-        "action": "CLOSE LONG",
-        "price": 0.05461,
-        "amount": 12882.8219,
-        "totalUSDT": 703.53,
-        "time": "5:38:34 AM",
-        "pnl": -16.1,
-        "pnlPercent": -2.24,
-        "reason": "Stop-Loss Protected (-2.24%)"
       }
     ],
-    "totalTrades": 80,
-    "winningTrades": 9,
+    "totalTrades": 84,
+    "winningTrades": 10,
     "autoTradingEnabled": true,
     "riskPerTradePercent": 12,
     "chartMode": "Wickless SuperTrend",
@@ -843,6 +843,24 @@
     "enableShorting": true
   },
   "recentSignals": [
+    {
+      "symbol": "NEARUSDT",
+      "signal": "LONG",
+      "action": "LONG",
+      "price": 3.062,
+      "time": "12:06:24 AM",
+      "mode": "3m · Wickless SuperTrend",
+      "reason": "Bullish Trend Entry"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "signal": "SHORT",
+      "action": "SHORT",
+      "price": 0.1487,
+      "time": "12:06:23 AM",
+      "mode": "3m · Wickless SuperTrend",
+      "reason": "Bearish Trend Entry (Short)"
+    },
     {
       "symbol": "BTCUSDT",
       "signal": "LONG",
@@ -1094,147 +1112,129 @@
       "time": "5:38:36 AM",
       "mode": "3m · Wickless SuperTrend",
       "reason": "Bullish Trend Entry"
-    },
-    {
-      "symbol": "PEPEUSDT",
-      "signal": "SHORT",
-      "action": "SHORT",
-      "price": 0.00000342,
-      "time": "5:38:36 AM",
-      "mode": "3m · Wickless SuperTrend",
-      "reason": "Bearish Trend Entry (Short)"
-    },
-    {
-      "symbol": "ADAUSDT",
-      "signal": "LONG",
-      "action": "LONG",
-      "price": 0.143,
-      "time": "5:38:34 AM",
-      "mode": "3m · Wickless SuperTrend",
-      "reason": "Bullish Trend Entry"
     }
   ],
   "marketScan": {
     "BTCUSDT": {
       "symbol": "BTCUSDT",
-      "price": 60410.08,
+      "price": 60595.34,
       "candleColor": "green",
-      "brickSize": "255.98116796",
-      "stopLevel": 60173.40883204,
-      "atr": "127.99058398",
+      "brickSize": "121.35744431",
+      "stopLevel": 60525.88561744,
+      "atr": "60.67872215",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "ETHUSDT": {
       "symbol": "ETHUSDT",
-      "price": 1687.08,
+      "price": 1691.17,
       "candleColor": "green",
-      "brickSize": "8.8864227",
-      "stopLevel": 1678.8035773,
-      "atr": "4.44321135",
+      "brickSize": "4.06104986",
+      "stopLevel": 1688.84383349,
+      "atr": "2.03052493",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "SOLUSDT": {
       "symbol": "SOLUSDT",
-      "price": 70.75,
+      "price": 71.11,
       "candleColor": "green",
-      "brickSize": "0.42367153",
-      "stopLevel": 70.35132847,
-      "atr": "0.21183577",
+      "brickSize": "0.19248779",
+      "stopLevel": 70.97945801,
+      "atr": "0.09624389",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "BNBUSDT": {
       "symbol": "BNBUSDT",
-      "price": 549.02,
-      "candleColor": "red",
-      "brickSize": "2.21277777",
-      "stopLevel": 549.50079155,
-      "atr": "1.10638889",
+      "price": 554.94,
+      "candleColor": "green",
+      "brickSize": "0.99510514",
+      "stopLevel": 554.20043873,
+      "atr": "0.49755257",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "DOGEUSDT": {
       "symbol": "DOGEUSDT",
-      "price": 0.05643,
-      "candleColor": "red",
-      "brickSize": "0.00030519",
-      "stopLevel": 0.05648037,
-      "atr": "0.00015259",
+      "price": 0.05655,
+      "candleColor": "green",
+      "brickSize": "0.00011427",
+      "stopLevel": 0.0564497,
+      "atr": "0.00005714",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "ADAUSDT": {
       "symbol": "ADAUSDT",
-      "price": 0.1479,
-      "candleColor": "green",
-      "brickSize": "0.00081916",
-      "stopLevel": 0.14713084,
-      "atr": "0.00040958",
+      "price": 0.1487,
+      "candleColor": "red",
+      "brickSize": "0.00044637",
+      "stopLevel": 0.14874294,
+      "atr": "0.00022318",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "XRPUSDT": {
       "symbol": "XRPUSDT",
-      "price": 0.9454,
+      "price": 0.9449,
       "candleColor": "green",
-      "brickSize": "0.00473756",
-      "stopLevel": 0.94091244,
-      "atr": "0.00236878",
+      "brickSize": "0.00219874",
+      "stopLevel": 0.94346251,
+      "atr": "0.00109937",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "AVAXUSDT": {
       "symbol": "AVAXUSDT",
-      "price": 6.557,
+      "price": 6.598,
       "candleColor": "green",
-      "brickSize": "0.03453129",
-      "stopLevel": 6.52546871,
-      "atr": "0.01726565",
+      "brickSize": "0.01403321",
+      "stopLevel": 6.58685199,
+      "atr": "0.00701661",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "PEPEUSDT": {
       "symbol": "PEPEUSDT",
-      "price": 0.00000344,
+      "price": 0.00000349,
       "candleColor": "green",
-      "brickSize": "4e-8",
-      "stopLevel": 0.00000341,
-      "atr": "2e-8",
+      "brickSize": "3e-8",
+      "stopLevel": 0.00000346,
+      "atr": "1e-8",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "SHIBUSDT": {
       "symbol": "SHIBUSDT",
       "price": 0.00000363,
-      "candleColor": "red",
+      "candleColor": "green",
       "brickSize": "2e-8",
-      "stopLevel": 0.00000363,
+      "stopLevel": 0.00000362,
       "atr": "1e-8",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "NEARUSDT": {
       "symbol": "NEARUSDT",
-      "price": 3.03,
+      "price": 3.06,
       "candleColor": "green",
-      "brickSize": "0.02857954",
-      "stopLevel": 3.00292046,
-      "atr": "0.01428977",
+      "brickSize": "0.01316935",
+      "stopLevel": 3.04783065,
+      "atr": "0.00658468",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     },
     "SUIUSDT": {
       "symbol": "SUIUSDT",
-      "price": 0.6609,
+      "price": 0.6691,
       "candleColor": "green",
-      "brickSize": "0.00419727",
-      "stopLevel": 0.65715273,
-      "atr": "0.00209864",
+      "brickSize": "0.00188911",
+      "stopLevel": 0.66761765,
+      "atr": "0.00094456",
       "signal": "HOLD",
       "mode": "Wickless SuperTrend"
     }
   },
-  "lastUpdated": "2026-11-26T15:45:54.326Z"
+  "lastUpdated": "2026-11-27T00:07:07.562Z"
 }
